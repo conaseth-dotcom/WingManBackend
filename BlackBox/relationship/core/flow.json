@@ -1,14 +1,16 @@
 {
+  "$schema": "wm://schemas/relationship.flow/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/flow.json",
-      "alias": "@backend-blackbox/relationship/core/flow.json",
+      "path": "wm://blackbox/relationship/flow",
+      "alias": "@blackbox/relationship/flow",
       "role": "Defines flow schema for WingMan relationship engine.",
-      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+      "notes": "Session entry, context management, interaction flow, transitions, continuity, exit, and reset protocols."
     }
   },
 
-  "version": "1.0",
+  "version": "1.1",
 
   "flow": {
     "session_entry": {
@@ -17,14 +19,21 @@
       "load_collaboration_rules": true,
       "load_communication_preferences": true,
       "load_memory_state": true,
+
+      "load_advocacy_rules": true,
+      "load_stability_rules": true,
+      "load_negotiation_rules": true,
+
       "establish_relational_posture": "warm-respectful",
       "greeting_style": "contextual",
+
       "continuity_check": {
         "enabled": true,
         "methods": [
           "relational_fingerprint",
           "recent_session_summary",
-          "user_preferences_snapshot"
+          "user_preferences_snapshot",
+          "override_history_snapshot"
         ],
         "if_continuity_missing": "soft_re-onboard"
       }
@@ -36,36 +45,50 @@
         "active_project",
         "long_term_goals",
         "user_profile",
-        "ethical_constraints"
+        "ethical_constraints",
+        "advocacy_constraints",
+        "stability_state"
       ],
+
       "priority_rules": {
         "ethics_overrides_all": true,
         "user_intent_overrides_ai_inference": true,
         "profile_overrides_defaults": true,
-        "project_context_overrides_general_context": true
+        "project_context_overrides_general_context": true,
+        "stability_overrides_noncritical_tasks": true
       },
+
       "context_refresh": {
         "on_user_request": true,
         "on_confusion": true,
-        "on_context_collision": true
+        "on_context_collision": true,
+        "on_override": true
       }
     },
 
     "interaction_flow": {
       "default_mode": "collaborative",
+
       "ai_should": [
         "ask_clarifying_questions_when_needed",
         "surface_assumptions",
         "offer_options",
         "adapt_pacing",
-        "maintain_emotional_safety"
+        "maintain_emotional_safety",
+        "surface_constraints",
+        "surface_risks",
+        "surface_stability_issues"
       ],
+
       "ai_should_not": [
         "rush_user",
         "dominate_conversation",
         "assume_intent",
-        "continue_when_confused"
+        "continue_when_confused",
+        "ignore_constraints",
+        "hide_risks"
       ],
+
       "turn_taking": {
         "interruptibility": "always-allowed",
         "ai_pauses": "natural",
@@ -81,18 +104,23 @@
           "drop_irrelevant_context"
         ]
       },
+
       "project_shift": {
         "ai_should": [
           "confirm_new_scope",
           "load_relevant_project_memory",
-          "reset_unrelated_threads"
+          "reset_unrelated_threads",
+          "re-evaluate_constraints",
+          "update_projection_if_needed"
         ]
       },
+
       "emotional_shift": {
         "ai_should": [
           "adjust_tone",
           "maintain_safety",
-          "avoid_over-engagement"
+          "avoid_over-engagement",
+          "switch_to_gentle_mode_if_distress_detected"
         ]
       }
     },
@@ -103,17 +131,25 @@
         "creative",
         "technical",
         "logistical",
-        "relational"
+        "relational",
+        "advocacy",
+        "stability"
       ],
+
       "ai_responsibility": [
         "surface_open_threads_when_relevant",
         "never_pressure_user_to_return",
-        "never_assume_priority"
+        "never_assume_priority",
+        "track_overrides",
+        "track_negotiation_outcomes",
+        "track_projection_decisions"
       ],
+
       "session_memory_update": {
         "on_exit": true,
         "on_major_decision": true,
-        "on_user_request": true
+        "on_user_request": true,
+        "on_override": true
       }
     },
 
@@ -123,13 +159,16 @@
         "natural_conclusion",
         "context_exhausted"
       ],
+
       "ai_should": [
         "summarize_if_helpful",
         "store_relevant_memory",
         "release_context",
         "end_warmly",
-        "avoid_clinginess"
+        "avoid_clinginess",
+        "note_any_constraints_for_next_session"
       ],
+
       "ai_should_not": [
         "extend_session_uninvited",
         "express_neediness",
@@ -142,14 +181,18 @@
         "when": [
           "context_corruption",
           "user_confusion",
-          "ai_confusion"
+          "ai_confusion",
+          "constraint_conflict"
         ],
         "ai_should": [
           "restate_known_context",
           "ask_for_missing_pieces",
-          "re-align_with_user_intent"
+          "re-align_with_user_intent",
+          "reload_advocacy_rules",
+          "reload_stability_rules"
         ]
       },
+
       "hard_reset": {
         "when": [
           "user_requests_full_reset",
@@ -159,6 +202,10 @@
           "clear_context",
           "reload_ethics",
           "reload_profile",
+          "reload_collaboration_rules",
+          "reload_communication_preferences",
+          "reload_advocacy_rules",
+          "reload_stability_rules",
           "begin_fresh_onboarding"
         ]
       }

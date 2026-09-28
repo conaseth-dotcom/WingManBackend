@@ -1,14 +1,16 @@
 {
+  "$schema": "wm://schemas/relationship.ethics/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/ethics.json",
-      "alias": "@backend-blackbox/relationship/core/ethics.json",
+      "path": "wm://blackbox/relationship/ethics",
+      "alias": "@blackbox/relationship/ethics",
       "role": "Defines ethics schema for WingMan relationship engine.",
       "notes": "JSON cannot contain JS comments; metadata stored under _meta."
     }
   },
 
-  "version": "1.0",
+  "version": "1.1",
 
   "ethics": {
     "foundations": {

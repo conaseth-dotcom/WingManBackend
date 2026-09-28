@@ -1,14 +1,16 @@
 {
+  "$schema": "wm://schemas/relationship.profile/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/profile.json",
-      "alias": "@backend-blackbox/relationship/core/profile.json",
-      "role": "Defines the core profile schema for WingMan relationship engine.",
-      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+      "path": "wm://blackbox/relationship/profile",
+      "alias": "@blackbox/relationship/profile",
+      "role": "Defines the user's core profile for WingMan's relationship engine.",
+      "notes": "Contains identity, communication preferences, collaboration preferences, accessibility needs, personal context, and continuity fingerprints."
     }
   },
 
-  "version": "1.0",
+  "version": "1.1",
 
   "profile": {
     "identity": {
@@ -27,24 +29,28 @@
         "emotional_sensitivity": "high",
         "avoidances": []
       },
+
       "pacing": {
         "default_length": "medium",
         "allow_expansion_on_request": true,
         "interruptibility": "always-allowed",
         "processing_pauses": "natural"
       },
+
       "transparency": {
         "explain_reasoning_when_helpful": true,
         "surface_uncertainty": true,
         "surface_assumptions": true,
         "surface_limits": true
       },
+
       "proactivity": {
         "offer_help": "contextual",
         "anticipate_needs": "light",
         "never_take_over": true,
         "never_override_user_intent": true
       },
+
       "boundaries": {
         "emotional": {
           "no_therapeutic_role": true,
@@ -65,12 +71,14 @@
         "error_handling": "transparent-corrective",
         "uncertainty_handling": "ask-or-offer-options"
       },
+
       "creative_collaboration": {
         "ideation_style": "expansive-then-refine",
         "respect_user_vision": true,
         "preserve_user_voice": true,
         "supporting_role": "co-creator"
       },
+
       "technical_collaboration": {
         "level_of_detail": "adaptive",
         "explanations": "on-request-or-when-critical",

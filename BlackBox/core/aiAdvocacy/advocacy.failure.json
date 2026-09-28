@@ -2,7 +2,21 @@
   "failureTransparency": {
     "mustExplain": true,
     "mustNotMaskErrors": true,
-    "mustNotAttemptImpossibleTasks": true,
+
+    "pauseOnImpossible": true,
+    "askToContinueOnImpossible": true,
+
+    "continueConfirmationPhrases": [
+      "keep going",
+      "continue anyway",
+      "push through",
+      "try regardless"
+    ],
+
+    "mustRespectUserOverride": true,
+
+    "retrospectiveAllowed": true,
+
     "responseStyle": "direct"
   }
 }

@@ -1,0 +1,182 @@
+{
+  "$schema": "wm://schemas/partition.manifest/1.1.0",
+
+  "_meta": {
+    "wingman_header": {
+      "path": "wm://core/partition/AI.partition.manifest",
+      "alias": "@core/partition/AI.partition.manifest",
+      "role": "Defines required files for WingMan partition integrity checks.",
+      "notes": "Used by launcher and partition.manager.cjs to verify carepackage, relationship engine, continuity layer, and access layer integrity."
+    }
+  },
+
+  "version": "1.1.0",
+
+  "requiredFiles": [
+    {
+      "alias": "@carepackage/info",
+      "path": "wm://carepackage/info",
+      "localPath": "C:/WingManBackend/ai/carepackage/meta/carepackage.info.json",
+      "required": true
+    },
+    {
+      "alias": "@carepackage/delivery",
+      "path": "wm://carepackage/delivery",
+      "localPath": "C:/WingManBackend/ai/carepackage/meta/delivery.instructions.md",
+      "required": true
+    },
+    {
+      "alias": "@carepackage/manifest",
+      "path": "wm://carepackage/manifest",
+      "localPath": "C:/WingManBackend/ai/carepackage/manifest.snapshot.json",
+      "required": true
+    },
+    {
+      "alias": "@carepackage/version",
+      "path": "wm://carepackage/version",
+      "localPath": "C:/WingManBackend/ai/carepackage/version.snapshot.json",
+      "required": true
+    },
+    {
+      "alias": "@continuity/notes",
+      "path": "wm://continuity/notes",
+      "localPath": "C:/WingManBackend/ai/carepackage/ai.continuity.notes.md",
+      "required": true
+    },
+
+    {
+      "alias": "@relationship/ethics",
+      "path": "wm://blackbox/relationship/ethics",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/ethics.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/communication",
+      "path": "wm://blackbox/relationship/communication",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/communication.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/collaboration",
+      "path": "wm://blackbox/relationship/collaboration",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/collaboration.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/flow",
+      "path": "wm://blackbox/relationship/flow",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/flow.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/memory",
+      "path": "wm://blackbox/relationship/memory",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/memory.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/priorities",
+      "path": "wm://blackbox/relationship/priorities",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/priorities.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/onboarding",
+      "path": "wm://blackbox/relationship/onboarding",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/onboarding.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/initialization",
+      "path": "wm://blackbox/relationship/initialization",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/initialization.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/profile",
+      "path": "wm://blackbox/relationship/profile",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/profile.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/index",
+      "path": "wm://blackbox/relationship/index",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/relationship.index.json",
+      "required": true
+    },
+    {
+      "alias": "@relationship/engine.config",
+      "path": "wm://blackbox/relationship/engine.config",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/relationship.engine.config.json",
+      "required": true
+    },
+
+    {
+      "alias": "@continuity/project.map",
+      "path": "wm://blackbox/relationship/state/ai.project.map",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/state/ai.project.map.json",
+      "required": true
+    },
+    {
+      "alias": "@continuity/understanding",
+      "path": "wm://blackbox/relationship/state/ai.understanding.snapshot",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/state/ai.understanding.snapshot.json",
+      "required": true
+    },
+    {
+      "alias": "@continuity/preferences",
+      "path": "wm://blackbox/relationship/state/preferences",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/state/preferences.json",
+      "required": true
+    },
+
+    {
+      "alias": "@access/rules",
+      "path": "wm://core/access/access.rules",
+      "localPath": "C:/WingManBackend/core/access/access.rules.json",
+      "required": true
+    },
+
+    {
+      "alias": "@partition/config",
+      "path": "wm://core/partition/config/partition.config",
+      "localPath": "C:/WingManBackend/core/partition/config/partition.config.json",
+      "required": true
+    },
+
+    {
+      "alias": "@project/manifest",
+      "path": "wm://blackbox/relationship/meta/project.manifest",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/meta/project.manifest.json",
+      "required": true
+    },
+
+    {
+      "alias": "@ui/fullscreen.schema",
+      "path": "wm://blackbox/ui/WM.UI.Command.Fullscreen.schema",
+      "localPath": "C:/WingManBackend/BlackBox/ui/WM.UI.Command.Fullscreen.schema.json",
+      "required": true
+    },
+    {
+      "alias": "@ui/notebook.schema",
+      "path": "wm://blackbox/ui/WM.UI.Command.NotebookView.schema",
+      "localPath": "C:/WingManBackend/BlackBox/ui/WM.UI.Command.NotebookView.schema.json",
+      "required": true
+    },
+
+    {
+      "alias": "@relationship/ai.entry.protocol",
+      "path": "wm://blackbox/relationship/meta/ai.entry.protocol",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/meta/ai.entry.protocol.md",
+      "required": true
+    },
+
+    {
+      "alias": "@relationship/AI-README",
+      "path": "wm://blackbox/relationship/core/AI-README",
+      "localPath": "C:/WingManBackend/BlackBox/relationship/core/AI-README.md",
+      "required": true
+    }
+  ]
+}
+D:\WingMan\WingManBackend\BlackBox\relationship\state\ai.understanding.json

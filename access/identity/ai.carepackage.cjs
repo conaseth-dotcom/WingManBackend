@@ -5,9 +5,8 @@
 
 import fs from "fs";
 import path from "path";
-
-const BLACKBOX_REL = "C:/WingManBackend/BlackBox";
-const CAREPACKAGE_ROOT = "C:/WingManBackend/ai/carepackage";
+const BLACKBOX_REL = "${dynamicPartitionRoot}/BlackBox";
+const CAREPACKAGE_ROOT = "${dynamicPartitionRoot}/ai/carepackage";
 
 function safeLoadJSON(filePath) {
   try {

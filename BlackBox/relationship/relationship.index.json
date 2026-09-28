@@ -1,18 +1,28 @@
 {
+  "$schema": "wm://schemas/relationship.index/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/relationship.index.json",
-      "alias": "@backend-blackbox/relationship/relationship.index.json",
+      "path": "wm://blackbox/relationship/index",
+      "alias": "@blackbox/relationship/index",
       "role": "Primary relationship model index. Defines the canonical structure of WingMan relationship data.",
-      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+      "notes": "Index only; does not store behavioral rules or preferences."
     }
   },
 
+  "version": "1.1.0",
+
   "model": {
-    "profiles": [],
-    "communications": [],
-    "collaborations": [],
-    "flows": [],
+    "ethics": [],
+    "priorities": [],
+    "advocacy": [],
+    "stability": [],
+    "initialization": [],
+    "onboarding": [],
+    "profile": [],
+    "communication": [],
+    "collaboration": [],
+    "flow": [],
     "memory": []
   }
 }

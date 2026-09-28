@@ -13,7 +13,8 @@ function loadJson(file) {
 }
 
 // Load all advocacy configs
-const base = "C:/WingManBackend/aiAdvocacy";
+const base = `${dynamicBackendRoot}/aiAdvocacy`;
+
 
 const identity      = loadJson(path.join(base, "advocacy.identity.json"));
 const constraints   = loadJson(path.join(base, "advocacy.constraints.json"));

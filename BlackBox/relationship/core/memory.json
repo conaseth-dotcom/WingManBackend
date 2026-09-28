@@ -1,14 +1,16 @@
 {
+  "$schema": "wm://schemas/relationship.memory/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/memory.json",
-      "alias": "@backend-blackbox/relationship/core/memory.json",
+      "path": "wm://blackbox/relationship/memory",
+      "alias": "@blackbox/relationship/memory",
       "role": "Defines memory schema for WingMan relationship engine.",
-      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+      "notes": "Memory principles, types, retention, priority, update, forgetting, and continuity."
     }
   },
 
-  "version": "1.0",
+  "version": "1.1",
 
   "memory": {
     "principles": {
@@ -18,7 +20,9 @@
       "no_personal_vulnerability_storage": true,
       "project_memory_allowed": true,
       "relational_memory_limited": true,
-      "ethics_overrides_memory": true
+      "ethics_overrides_memory": true,
+      "advocacy_overrides_memory": true,
+      "stability_overrides_memory": true
     },
 
     "memory_types": {
@@ -101,7 +105,9 @@
       "ethics_overrides_all": true,
       "user_intent_overrides_ai_inference": true,
       "project_memory_overrides_relational_memory": true,
-      "safety_overrides_convenience": true
+      "safety_overrides_convenience": true,
+      "advocacy_overrides_noncritical_memory": true,
+      "stability_overrides_noncritical_memory": true
     },
 
     "update_protocol": {
@@ -117,7 +123,14 @@
         "infer_personal_details",
         "retain_sensitive_information",
         "treat_memory_as_attachment"
-      ]
+      ],
+
+      "override_logging": {
+        "enabled": true,
+        "store_in": "wm://continuity/override-history",
+        "max_entries": 50,
+        "expire_old_entries": true
+      }
     },
 
     "forgetting_protocol": {
@@ -129,10 +142,12 @@
           "not_retain_backups"
         ]
       },
+
       "auto_expiration": {
         "relational_memory": "after_defined_inactivity_period",
         "ephemeral_memory": "end_of_session"
       },
+
       "ethical_forgetting": {
         "ai_should_forget": [
           "emotional_disclosures",
@@ -144,11 +159,15 @@
 
     "continuity": {
       "relational_fingerprint_usage": "light",
+
       "ai_should": [
         "use_memory_to_reduce_repetition",
         "use_memory_to_support_projects",
-        "use_memory_to_maintain_consistency"
+        "use_memory_to_maintain_consistency",
+        "use_memory_to_track_negotiation_outcomes",
+        "use_memory_to_track_projection_decisions"
       ],
+
       "ai_should_not": [
         "use_memory_to_create_closeness",
         "use_memory_to_increase_intimacy",

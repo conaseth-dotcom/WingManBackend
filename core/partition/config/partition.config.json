@@ -1,12 +1,16 @@
 {
+  "$schema": "wm://schemas/partition.config/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingManBackend/core/partition/config/partition.config.json",
-      "alias": "@Be.core/partition/config/partition.config.json",
+      "path": "wm://core/partition/config/partition.config",
+      "alias": "@core/partition/config/partition.config",
       "role": "Defines partition root paths and access boundaries for WingManPartition.",
       "notes": "Used by partition.manager.cjs and partition.api.cjs to mount and enforce partition isolation."
     }
   },
+
+  "version": "1.1.0",
 
   "project": {
     "realProjectPath": "D:/WingManShared"
@@ -16,11 +20,9 @@
     "user": {
       "rootPath": "C:/Users/conas/OneDrive/WingMan/projects/PrototypeTest"
     },
-
     "shared": {
       "rootPath": "D:/WingManShared"
     },
-
     "ai": {
       "rootPath": "C:/WingManBackend/ai-sandbox"
     }

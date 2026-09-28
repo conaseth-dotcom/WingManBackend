@@ -86,10 +86,9 @@ console.log("ENV LOADED:", process.env.ENV);
         PORT           : parseInt(process.env.PORT         || '4000', 10),
         HOST           : process.env.HOST                  || '0.0.0.0',
         ENV            : process.env.NODE_ENV              || 'production',
-        XTTS_PORT      : parseInt(process.env.XTTS_PORT    || '8020', 10),
-        WHISPER_PORT   : parseInt(process.env.WHISPER_PORT || '9000', 10),
 
-        // ⭐ This is the missing piece
+        // Removed XTTS_PORT and WHISPER_PORT (TTS/STT no longer backend services)
+
         PARTITION_ROOT : process.env.PARTITION_ROOT
       };
     }
@@ -426,7 +425,7 @@ console.log("ENV LOADED:", process.env.ENV);
       const { messages } = req.body;
       console.log("[WM-CHAT] Incoming messages payload:", messages);
 
-      logger.info("[Voice/Text] Received from frontend:", {
+      logger.info("[Frontend Message] Received:", {
         text: messages?.[messages.length - 1]?.content
       });
 
@@ -535,15 +534,16 @@ console.log("ENV LOADED:", process.env.ENV);
     }
   });
 
-  // ─── TTS API (Piper-based) ──────────────────────────────────────────────────
-  try {
-    console.log("[WM-API] Loading api/tts.cjs…");
-    const ttsAPI = require(r('api/tts.cjs'));
-    safeMount('/api/tts', ttsAPI, 'tts-api');
-  } catch (e) {
-    logger.warn('TTS API unavailable', { err: e.message });
-    console.log("[WM-API] TTS API unavailable:", e.message);
-  }
+ // ─── TTS API (Removed — now handled in frontend) ───────────────────────────────
+try {
+  console.log("[WM-API] Skipping backend TTS API — TTS now handled in frontend.");
+  // No backend TTS module to load.
+  // No safeMount call needed.
+} catch (e) {
+  logger.warn('TTS API unavailable (expected — backend TTS removed)', { err: e.message });
+  console.log("[WM-API] Backend TTS API intentionally disabled:", e.message);
+}
+
 
   // ─── Final bind ─────────────────────────────────────────────────────────────
   const BOOT_END = Date.now();

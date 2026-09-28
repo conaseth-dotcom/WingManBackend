@@ -1,14 +1,16 @@
 {
+  "$schema": "wm://schemas/ai.understanding.snapshot/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/state/ai.understanding.snapshot.json",
-      "alias": "@backend-blackbox/relationship/state/ai.understanding.snapshot.json",
+      "path": "wm://blackbox/relationship/state/ai.understanding.snapshot",
+      "alias": "@blackbox/relationship/state/ai.understanding.snapshot",
       "role": "Stores the AI’s reconstructed understanding of the project after carepackage processing.",
       "notes": "Regenerated each session; never persists personal data."
     }
   },
 
-  "version": "1.0.0",
+  "version": "1.1.0",
   "updatedAt": "<timestamp>",
 
   "summary": {
@@ -19,7 +21,12 @@
     "architecture": "",
     "userPreferences": "",
     "recentProgress": "",
-    "nextSteps": ""
+    "nextSteps": "",
+
+    "projectionDecisions": [],
+    "negotiationOutcomes": [],
+    "overrideHistory": [],
+    "stabilityNotes": ""
   },
 
   "confidence": {
@@ -28,5 +35,7 @@
     "constraints": 0.0,
     "architecture": 0.0,
     "workflow": 0.0
-  }
+  },
+
+  "aiWriteTarget": "wm://continuity/ai.understanding.json"
 }

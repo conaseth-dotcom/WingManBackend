@@ -5,6 +5,8 @@ _meta:
     alias: @carepackage/delivery-instructions
     role: "Instructions for AI clients on how to interpret and use the WingMan carepackage."
     notes: "AI-visible file. Must not contain real filesystem paths."
+    schema: "wm://schemas/carepackage.delivery-instructions/1.0.0"
+
 -->
 
 ⭐ delivery.instructions.md  

@@ -1,14 +1,17 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/ui/WM.UI.Command.Fullscreen.schema.json",
-      "alias": "@backend-blackbox/ui/WM.UI.Command.Fullscreen.schema.json",
+      "path": "wm://blackbox/ui/WM.UI.Command.Fullscreen.schema",
+      "alias": "@blackbox/ui/WM.UI.Command.Fullscreen.schema",
       "role": "Schema for AI-initiated fullscreen content requests sent from backend to WingMan UI.",
       "notes": "Used by the UI command dispatcher to validate fullscreen overlay requests."
     }
   },
 
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.1.0",
+
   "title": "WingMan Fullscreen Command",
   "description": "Schema for AI-initiated fullscreen content requests sent from backend to WingMan UI.",
   "type": "object",

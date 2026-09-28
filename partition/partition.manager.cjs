@@ -15,6 +15,7 @@
      - Provide safe backend APIs for IPC
      - Provide full filesystem API (write/read/delete/list/move/copy)
      - Integrate Advocacy Engine for feasibility checks
+     - Run BlackBox/partition integrity checks and trigger rebuild if needed
 ========================================================================= */
 
 const fs = require("fs");
@@ -36,8 +37,13 @@ const { copyFile } = require("./fs/fs.copyFile.cjs");
 const { Paths } = require("./paths/paths.cjs");
 const { loadJSON, saveJSON } = require("./api/storage.cjs");
 
-// Advocacy Engine
-const AdvocacyEngine = require("C:/WingManBackend/BlackBox/core/aiAdvocacy/advocacy.engine.cjs");
+// Advocacy Engine — now loaded RELATIVELY
+const AdvocacyEngine = require(
+  path.join(Paths.getBlackBoxRoot(), "core/aiAdvocacy/advocacy.engine.cjs")
+);
+
+// Partition integrity checker
+const { runIntegrityCheck } = require("./partition.integrity.checker.cjs");
 
 module.exports = {
   /* ------------------------------------------------------------
@@ -51,6 +57,22 @@ module.exports = {
       this.sizeMB = partitionSizeMB;
       this.version = version;
 
+      // 1. Run integrity check (BlackBox + required files)
+      const manifestPath = path.join(__dirname, "AI.partition.manifest.json");
+      const integrity = runIntegrityCheck(manifestPath);
+
+      if (!integrity.ok) {
+        logger.error("[Partition] Integrity check failed", {
+          reason: integrity.reason,
+          criticalFailures: integrity.criticalFailures,
+          results: integrity.results
+        });
+        return false;
+      }
+
+      logger.info("[Partition] Integrity verified.");
+
+      // 2. Ensure partition root and metadata
       this.ensureRoot(logger);
       this.ensureMetadata(logger);
 
@@ -77,7 +99,7 @@ module.exports = {
      Helpers
   ------------------------------------------------------------ */
   getMetaPath() {
-    return Paths.getPartitionMetaFile(); // NEW LOCATION
+    return Paths.getPartitionMetaFile();
   },
 
   ensureRoot(logger) {
@@ -111,7 +133,7 @@ module.exports = {
     const metaPath = this.getMetaPath();
     try {
       return JSON.parse(fs.readFileSync(metaPath, "utf8"));
-    } catch (err) {
+    } catch {
       return null;
     }
   },
@@ -186,7 +208,6 @@ module.exports = {
      Now includes Advocacy Engine feasibility checks
   ------------------------------------------------------------ */
   resize(newSizeMB) {
-    // Advocacy check
     const usageMB = this.getUsage();
     const availableMB = this.sizeMB - usageMB;
 
@@ -204,7 +225,6 @@ module.exports = {
       };
     }
 
-    // Normal resize logic
     if (!newSizeMB || newSizeMB <= 0) {
       return { ok: false, error: "Invalid sizeMB" };
     }
@@ -227,7 +247,7 @@ module.exports = {
   },
 
   /* ------------------------------------------------------------
-     JSON OBJECT HELPERS (existing behavior)
+     JSON OBJECT HELPERS
   ------------------------------------------------------------ */
   loadPartitionObject(id, base) {
     const file = Paths.getPartitionFile(id);
@@ -242,7 +262,7 @@ module.exports = {
   },
 
   /* ------------------------------------------------------------
-     FILESYSTEM API (new)
+     FILESYSTEM API
   ------------------------------------------------------------ */
   writeFileToPartition(relativePath, data, options) {
     return writeFile(relativePath, data, options);

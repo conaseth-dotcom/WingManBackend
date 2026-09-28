@@ -1,8 +1,10 @@
 {
+  "$schema": "wm://schemas/blackbox.task-contract/1.0.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/autonomy/task.contract.json",
-      "alias": "@backend-blackbox/autonomy/task.contract.json",
+      "path": "wm://blackbox/autonomy/task-contract",
+      "alias": "@blackbox/autonomy/task-contract",
       "role": "Defines the contract schema for autonomous tasks executed by BlackBox.",
       "notes": "JSON cannot contain JS comments; metadata stored under _meta."
     }

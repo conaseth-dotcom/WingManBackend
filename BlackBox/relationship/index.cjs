@@ -45,6 +45,11 @@ const { buildRelationship } = require("./build/build-relationship.cjs");
 const { runtime: wingmanRuntime } = require("./runtime/index.cjs");
 
 // ---------------------------------------------------------------------------
+// Continuity Gateway (NEW)
+// ---------------------------------------------------------------------------
+const continuity = require("./state/continuity.gateway.cjs");
+
+// ---------------------------------------------------------------------------
 // Main loader function
 // ---------------------------------------------------------------------------
 function loadRelationshipModel(rawModules) {
@@ -84,8 +89,17 @@ function loadRelationshipModel(rawModules) {
 
   // 5. BUILD FINAL MODEL
   const model = buildRelationship(resolved);
+  // 6. Attach continuity subsystem (canonical + derived)
+  model.continuity = continuity.loadAll();
 
-  // 6. ATTACH RUNTIME LAYER
+  // 7. Attach continuity writers for runtime use
+  model.continuity.write = {
+    understanding: continuity.writeUnderstanding,
+    projectMap: continuity.writeProjectMap,
+    preferences: continuity.writePreferences
+  };
+
+  // 8. ATTACH RUNTIME LAYER
   model.runtime = wingmanRuntime;
 
   return model;

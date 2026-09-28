@@ -3,10 +3,67 @@
     "maxMB": 50000,
     "softLimitMB": 45000,
     "newUserLimitMB": 10,
+
+    "projectionProtocol": {
+      "enabled": true,
+      "mustEstimateTotalSize": true,
+      "mustEstimatePhaseSizes": true,
+      "mustExplainRisks": true,
+      "mustExplainCompressionOptions": true,
+      "mustExplainOverbuildRisks": true,
+      "defaultPhaseMB": 4000,
+      "proposalFormat": "written"
+    },
+
+    "negotiationProtocol": {
+      "enabled": true,
+      "allowUserPhaseAdjustment": true,
+      "allowUserOverride": true,
+      "allowCompactBuildRequests": true,
+      "allowAggressiveBuildRequests": true,
+      "toneUsesPersonality": true,
+      "acknowledgementPhrases": [
+        "Understood — beginning Phase 1.",
+        "Okay — starting with the agreed phase size.",
+        "Confirmed — proceeding with the negotiated plan."
+      ]
+    },
+
     "rules": [
       "If usage exceeds softLimitMB, notify the user.",
       "If a task requires more space than available, request expansion.",
-      "If expansion is denied, propose compression or deletion."
-    ]
+      "If expansion is denied, propose compression, deletion, or external storage.",
+      "If all alternatives are denied, pause and ask whether to continue anyway.",
+      "If the user confirms continuation, proceed but warn about potential corruption or failure.",
+      "If continuation leads to failure, provide retrospective confirmation."
+    ],
+
+    "personalityWarnings": {
+      "professional": "Storage usage is approaching the limit. Recommend expansion.",
+      "sarcastic": "Guess what’s full again? Yep — storage.",
+      "surly": "Storage’s tapped. Want me to keep going?",
+      "playful": "We’re squishing the storage ceiling. Should I keep squeezing?",
+      "gentle": "We’re close to the storage limit. Would you like me to continue?"
+    },
+
+    "pauseOnImpossible": true,
+    "askToContinueOnImpossible": true,
+
+    "continueConfirmationPhrases": [
+      "keep going",
+      "continue anyway",
+      "push through",
+      "try regardless"
+    ],
+
+    "overrideAware": true,
+
+    "overrideHistory": {
+      "writeTo": "wm://continuity/override-history",
+      "maxEntries": 50,
+      "expireOldEntries": true
+    },
+
+    "protectOperationalIntegrity": true
   }
 }

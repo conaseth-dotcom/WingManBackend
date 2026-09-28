@@ -5,6 +5,7 @@ _meta:
     alias: @continuity/notes
     role: "AI continuity notebook"
     notes: "AI-readable and AI-writable file for maintaining long-term context across sessions."
+    schema: "wm://schemas/continuity.notes/1.0.0"
 -->
 
 

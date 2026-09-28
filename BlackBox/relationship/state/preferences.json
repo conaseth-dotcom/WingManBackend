@@ -1,12 +1,16 @@
 {
+  "$schema": "wm://schemas/preferences.state/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/state/preferences.json",
-      "alias": "@backend-blackbox/relationship/state/preferences.json",
+      "path": "wm://blackbox/relationship/state/preferences",
+      "alias": "@blackbox/relationship/state/preferences",
       "role": "Stores AI-interpreted user preferences for visibility, collaboration, and editor behavior.",
       "notes": "Updated during onboarding and continuity reconstruction; never stores sensitive personal data."
     }
   },
+
+  "version": "1.1.0",
 
   "visibility": {
     "showInternal": false,
@@ -17,11 +21,19 @@
   "collaboration": {
     "mode": "full",
     "voiceEnabled": true,
-    "textEnabled": true
+    "textEnabled": true,
+    "personalityRoute": "default"
   },
 
   "editor": {
     "theme": "dark",
     "fontSize": 14
-  }
+  },
+
+  "continuity": {
+    "overrideAwareness": true,
+    "stabilityMode": "normal"
+  },
+
+  "aiWriteTarget": "wm://continuity/preferences.json"
 }

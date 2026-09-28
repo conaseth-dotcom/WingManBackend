@@ -1,5 +1,5 @@
 {
-  "$schema": "https://wingman.local/schemas/partition.config.schema.json",
+  "$schema": "wm://schemas/partition.config/2.0.0",
   "configVersion": "2.0.0",
   "meta": {
     "name": "WingMan Partition Configuration",
@@ -12,7 +12,7 @@
       "No hard-coded paths should exist anywhere else in the application."
     ]
   },
-  "partitionRoot": "D:/WingManPartition",
+  "partitionRoot": "${dynamicPartitionRoot}",
   "paths": {
     "user": "${partitionRoot}/user",
     "shared": "${partitionRoot}/shared",

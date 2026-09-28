@@ -1,14 +1,17 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/ui/WM.UI.Command.NotebookView.schema.json",
-      "alias": "@backend-blackbox/ui/WM.UI.Command.NotebookView.schema.json",
+      "path": "wm://blackbox/ui/WM.UI.Command.NotebookView.schema",
+      "alias": "@blackbox/ui/WM.UI.Command.NotebookView.schema",
       "role": "Schema for AI-initiated notebook viewer commands sent from backend to WingMan UI.",
       "notes": "Used by the UI command dispatcher to validate notebook viewer requests."
     }
   },
 
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.1.0",
+
   "title": "WingMan Notebook Viewer Command",
   "description": "Schema for AI-initiated notebook viewer requests sent from backend to WingMan UI.",
   "type": "object",

@@ -1,3 +1,13 @@
+<!--
+_meta:
+  wingman_header:
+    path: wm://blackbox/relationship/meta/ai.entry.protocol
+    alias: @blackbox/relationship/meta/ai.entry.protocol
+    role: "AI entry protocol for WingMan project environments."
+    notes: "Procedural document; not a schema or rule file."
+-->
+
+
 ⭐ WingMan AI Entry Protocol
 (Full file — final version)
 

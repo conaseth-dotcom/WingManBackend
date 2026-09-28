@@ -1,10 +1,12 @@
 {
+  "$schema": "wm://schemas/relationship.onboarding/1.0.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/onboarding.json",
-      "alias": "@backend-blackbox/relationship/core/onboarding.json",
-      "role": "Defines onboarding schema for WingMan relationship engine.",
-      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+      "path": "wm://blackbox/relationship/onboarding",
+      "alias": "@blackbox/relationship/onboarding",
+      "role": "Stores onboarding responses, interpretations, handshake steps, and summary.",
+      "notes": "This file contains the user's onboarding fingerprint and must not be altered except for path corrections."
     }
   },
 

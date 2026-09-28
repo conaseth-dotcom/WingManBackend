@@ -1,12 +1,16 @@
 {
+  "$schema": "wm://schemas/access.rules/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "C:/WingMan/projects/Electron/WingManBackend/core/access/access.rules.json",
-      "alias": "@backend-core/access/access.rules.json",
+      "path": "wm://core/access/access.rules",
+      "alias": "@core/access/access.rules",
       "role": "Defines access control rules for WingMan core subsystems, including AI entry permissions.",
       "notes": "Loaded by core/access to determine minimum access levels for privileged operations."
     }
   },
+
+  "version": "1.1.0",
 
   "ai.enter": {
     "minLevel": 6,

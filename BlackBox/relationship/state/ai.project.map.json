@@ -1,14 +1,16 @@
 {
+  "$schema": "wm://schemas/ai.project.map/1.1.0",
+
   "_meta": {
     "wingman_header": {
-      "path": "wm://carepackage/manifest-snapshot",
-      "alias": "@carepackage/manifest-snapshot",
-      "role": "Snapshot of the project manifest at the time of carepackage generation.",
-      "notes": "Carepackage metadata; used by AI clients to understand project structure."
+      "path": "wm://blackbox/relationship/state/ai.project.map",
+      "alias": "@blackbox/relationship/state/ai.project.map",
+      "role": "AI-generated project map used to rebuild continuity and understand project structure.",
+      "notes": "Generated after Project Interview; updated as the project evolves."
     }
   },
 
-  "version": "1.0.0",
+  "version": "1.1.0",
   "updatedAt": "<timestamp>",
 
   "project": {
@@ -41,5 +43,7 @@
     "truthFiles": [],
     "unstableAreas": [],
     "aiStartHere": ""
-  }
+  },
+
+  "aiWriteTarget": "wm://continuity/ai.project.map.json"
 }

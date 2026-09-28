@@ -1,3 +1,4 @@
 {
-  "partitionRoot": "D:/WingManPartition"
+  "partitionRoot": "${dynamicPartitionRoot}"
+
 }

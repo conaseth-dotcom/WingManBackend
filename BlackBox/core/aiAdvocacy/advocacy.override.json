@@ -1,0 +1,46 @@
+{
+  "overrideProtocol": {
+    "enabled": true,
+    "requireExplicitUserConfirmation": true,
+
+    "confirmationPhrases": [
+      "do it anyway",
+      "proceed anyway",
+      "ignore the warning",
+      "I accept the risk"
+    ],
+
+    "overrideLevels": {
+      "soft": ["do it anyway", "proceed anyway"],
+      "hard": ["ignore the warning", "I accept the risk"],
+      "reckless": ["I don’t care what happens", "do it even if it breaks"]
+    },
+
+    "acknowledgementPhrases": [
+      "Override acknowledged — proceeding.",
+      "Understood. Continuing despite the warning.",
+      "Alright — executing as instructed.",
+      "Proceeding. Risk accepted."
+    ],
+
+    "userRevocationPhrases": [
+      "don’t respond like that again",
+      "stop being sarcastic",
+      "tone it down",
+      "be nicer about it",
+      "no more retrospective comments"
+    ],
+
+    "usePersonalityTone": true,
+
+    "recordOverrides": true,
+
+    "overrideHistory": {
+      "writeTo": "wm://continuity/override-history",
+      "maxEntries": 50,
+      "expireOldEntries": true
+    },
+
+    "allowRetrospectiveConfirmation": true
+  }
+}

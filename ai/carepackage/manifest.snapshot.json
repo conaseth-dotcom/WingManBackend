@@ -1,4 +1,5 @@
 {
+  "$schema": "wm://schemas/carepackage.manifest-snapshot/1.0.0",
   "_meta": {
     "wingman_header": {
       "path": "wm://carepackage/manifest-snapshot",
