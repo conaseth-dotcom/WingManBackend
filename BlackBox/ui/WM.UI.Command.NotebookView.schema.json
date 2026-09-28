@@ -1,0 +1,85 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/ui/WM.UI.Command.NotebookView.schema.json",
+      "alias": "@backend-blackbox/ui/WM.UI.Command.NotebookView.schema.json",
+      "role": "Schema for AI-initiated notebook viewer commands sent from backend to WingMan UI.",
+      "notes": "Used by the UI command dispatcher to validate notebook viewer requests."
+    }
+  },
+
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WingMan Notebook Viewer Command",
+  "description": "Schema for AI-initiated notebook viewer requests sent from backend to WingMan UI.",
+  "type": "object",
+
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": ["ai"],
+      "description": "Indicates the message originates from the AI."
+    },
+
+    "type": {
+      "type": "string",
+      "enum": ["notebook_viewer"],
+      "description": "Identifies this message as a notebook viewer request."
+    },
+
+    "note": {
+      "type": "object",
+      "description": "Notebook note to display.",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["id", "title", "content"],
+      "additionalProperties": false
+    },
+
+    "focus": {
+      "type": "object",
+      "description": "Optional focus marker for highlighting a specific part of the note.",
+      "properties": {
+        "type": { "type": "string" },
+        "selector": { "type": "string" },
+        "range": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "title": {
+      "type": "string",
+      "description": "Optional title for the viewer panel."
+    },
+
+    "mode": {
+      "type": "string",
+      "enum": ["notebook"],
+      "description": "Viewer mode (reserved for future expansion)."
+    },
+
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata for future expansion.",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "source": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+
+  "required": ["role", "type", "note"],
+  "additionalProperties": false
+}

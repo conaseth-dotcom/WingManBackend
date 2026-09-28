@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "wm://carepackage/manifest-snapshot",
+      "alias": "@carepackage/manifest-snapshot",
+      "role": "Snapshot of the canonical project manifest at the time of carepackage generation."
+    }
+  },
+
+  "snapshotVersion": "1.0.0",
+  "generatedAt": "INITIALIZE_ON_FIRST_GENERATION",
+
+  "project": {
+    "name": "",
+    "purpose": "",
+    "stage": ""
+  },
+
+  "structure": {
+    "projectRoot": "",
+    "subsystems": {},
+    "entryPoint": "",
+    "deprecatedPaths": []
+  },
+
+  "rooms": {
+    "roomsRoot": "",
+    "list": [],
+    "entryRoom": "",
+    "deprecated": []
+  },
+
+  "architecture": {
+    "philosophy": "",
+    "namingConventions": "",
+    "patterns": []
+  },
+
+  "userPreferences": {
+    "editStyle": "",
+    "avoidAreas": [],
+    "workflowNotes": ""
+  },
+
+  "truthSources": {
+    "truthFiles": [],
+    "unstableAreas": [],
+    "aiStartHere": ""
+  },
+
+  "integrity": {
+    "source": "project.manifest.json",
+    "checksumAlgorithm": "sha256",
+    "checksum": "INITIALIZE_ON_FIRST_GENERATION"
+  }
+}

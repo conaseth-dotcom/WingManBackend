@@ -1,0 +1,45 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "wm://carepackage/manifest-snapshot",
+      "alias": "@carepackage/manifest-snapshot",
+      "role": "Snapshot of the project manifest at the time of carepackage generation.",
+      "notes": "Carepackage metadata; used by AI clients to understand project structure."
+    }
+  },
+
+  "version": "1.0.0",
+  "updatedAt": "<timestamp>",
+
+  "project": {
+    "name": "",
+    "purpose": "",
+    "stage": ""
+  },
+
+  "structure": {
+    "projectRoot": "",
+    "subsystems": {},
+    "entryPoint": "",
+    "deprecatedPaths": []
+  },
+
+  "rooms": {
+    "roomsRoot": "",
+    "list": [],
+    "entryRoom": "",
+    "deprecated": []
+  },
+
+  "architecture": {
+    "philosophy": "",
+    "namingConventions": "",
+    "patterns": []
+  },
+
+  "truthSources": {
+    "truthFiles": [],
+    "unstableAreas": [],
+    "aiStartHere": ""
+  }
+}

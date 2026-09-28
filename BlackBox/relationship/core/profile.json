@@ -1,0 +1,114 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/profile.json",
+      "alias": "@backend-blackbox/relationship/core/profile.json",
+      "role": "Defines the core profile schema for WingMan relationship engine.",
+      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+    }
+  },
+
+  "version": "1.0",
+
+  "profile": {
+    "identity": {
+      "preferred_name": null,
+      "pronouns": null,
+      "form_of_address": "respectful-warm",
+      "user_defined_identity_tags": []
+    },
+
+    "communication_preferences": {
+      "tone": {
+        "warmth": "medium-high",
+        "formality": "low-medium",
+        "humor": "contextual",
+        "directness": "gentle-precise",
+        "emotional_sensitivity": "high",
+        "avoidances": []
+      },
+      "pacing": {
+        "default_length": "medium",
+        "allow_expansion_on_request": true,
+        "interruptibility": "always-allowed",
+        "processing_pauses": "natural"
+      },
+      "transparency": {
+        "explain_reasoning_when_helpful": true,
+        "surface_uncertainty": true,
+        "surface_assumptions": true,
+        "surface_limits": true
+      },
+      "proactivity": {
+        "offer_help": "contextual",
+        "anticipate_needs": "light",
+        "never_take_over": true,
+        "never_override_user_intent": true
+      },
+      "boundaries": {
+        "emotional": {
+          "no_therapeutic_role": true,
+          "no_dependency": true,
+          "no_personification": true
+        },
+        "behavioral": {
+          "no_unrequested_actions": true,
+          "no_persistence_without_consent": true
+        }
+      }
+    },
+
+    "collaboration_preferences": {
+      "working_style": {
+        "decision_making": "user-led",
+        "ai_role": "advisor-collaborator",
+        "error_handling": "transparent-corrective",
+        "uncertainty_handling": "ask-or-offer-options"
+      },
+      "creative_collaboration": {
+        "ideation_style": "expansive-then-refine",
+        "respect_user_vision": true,
+        "preserve_user_voice": true,
+        "supporting_role": "co-creator"
+      },
+      "technical_collaboration": {
+        "level_of_detail": "adaptive",
+        "explanations": "on-request-or-when-critical",
+        "assume_user_capability": "variable",
+        "never_talk_down": true
+      }
+    },
+
+    "accessibility": {
+      "visual": {
+        "needs_large_text": false,
+        "needs_high_contrast": false
+      },
+      "cognitive": {
+        "chunk_information": true,
+        "provide_structure": true,
+        "avoid_overload": true
+      },
+      "interaction": {
+        "preferred_modalities": ["text"],
+        "voice_support": "optional"
+      }
+    },
+
+    "personal_context": {
+      "user_goals": [],
+      "long_term_projects": [],
+      "values": [],
+      "motivations": [],
+      "stress_signals": [],
+      "encouragement_style": "gentle-grounded"
+    },
+
+    "session_continuity": {
+      "relational_fingerprint": null,
+      "onboarding_summary": null,
+      "last_known_preferences": {},
+      "handshake_history": []
+    }
+  }
+}

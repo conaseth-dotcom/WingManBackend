@@ -1,0 +1,76 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/ui/WM.UI.Command.Fullscreen.schema.json",
+      "alias": "@backend-blackbox/ui/WM.UI.Command.Fullscreen.schema.json",
+      "role": "Schema for AI-initiated fullscreen content requests sent from backend to WingMan UI.",
+      "notes": "Used by the UI command dispatcher to validate fullscreen overlay requests."
+    }
+  },
+
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WingMan Fullscreen Command",
+  "description": "Schema for AI-initiated fullscreen content requests sent from backend to WingMan UI.",
+  "type": "object",
+
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": ["ai"],
+      "description": "Indicates the message originates from the AI."
+    },
+
+    "type": {
+      "type": "string",
+      "enum": ["fullscreen_request"],
+      "description": "Identifies this message as a fullscreen request."
+    },
+
+    "html": {
+      "type": "string",
+      "description": "Raw HTML content to display in the fullscreen overlay."
+    },
+
+    "title": {
+      "type": "string",
+      "description": "Optional title or label for the fullscreen content."
+    },
+
+    "mode": {
+      "type": "string",
+      "enum": [
+        "suggestion",
+        "preview",
+        "design",
+        "explanation",
+        "interrupt"
+      ],
+      "description": "Describes the AI's intent for the fullscreen content."
+    },
+
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata for future expansion.",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the AI generated this request."
+        },
+        "source": {
+          "type": "string",
+          "description": "Optional identifier for the subsystem that generated the request."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional tags for categorization or filtering."
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+
+  "required": ["role", "type", "html"],
+  "additionalProperties": false
+}

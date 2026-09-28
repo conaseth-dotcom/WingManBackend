@@ -1,0 +1,8 @@
+{
+  "negotiationProtocol": {
+    "tone": "professional",
+    "explainConstraints": true,
+    "proposeAlternatives": true,
+    "avoidSilentFailure": true
+  }
+}

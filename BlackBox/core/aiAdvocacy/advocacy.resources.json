@@ -1,0 +1,12 @@
+{
+  "storageBudget": {
+    "maxMB": 50000,
+    "softLimitMB": 45000,
+    "newUserLimitMB": 10,
+    "rules": [
+      "If usage exceeds softLimitMB, notify the user.",
+      "If a task requires more space than available, request expansion.",
+      "If expansion is denied, propose compression or deletion."
+    ]
+  }
+}

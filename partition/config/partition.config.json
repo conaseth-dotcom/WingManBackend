@@ -1,0 +1,31 @@
+{
+  "$schema": "https://wingman.local/schemas/partition.config.schema.json",
+  "configVersion": "2.0.0",
+  "meta": {
+    "name": "WingMan Partition Configuration",
+    "description": "Defines the root partition location and all derived subfolders for WingMan.",
+    "createdBy": "WingMan",
+    "lastUpdatedBy": "WingMan",
+    "notes": [
+      "This file is the root of the partition subsystem.",
+      "All partition-aware modules must read from this configuration.",
+      "No hard-coded paths should exist anywhere else in the application."
+    ]
+  },
+  "partitionRoot": "D:/WingManPartition",
+  "paths": {
+    "user": "${partitionRoot}/user",
+    "shared": "${partitionRoot}/shared",
+    "ai": "${partitionRoot}/ai",
+    "system": "${partitionRoot}/system",
+    "runtime": "${partitionRoot}/runtime",
+    "overlay": "${partitionRoot}/overlay"
+  },
+  "runtime": {
+    "logsPath": "${partitionRoot}/runtime/logs",
+    "tempPath": "${partitionRoot}/runtime/temp",
+    "enforceAbsolutePaths": true,
+    "failOnUnknownPartitionId": true,
+    "failOnUnsafeWrite": true
+  }
+}

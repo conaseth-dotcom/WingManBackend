@@ -1,0 +1,16 @@
+﻿services:
+  - type: web
+    name: wingmanbackend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: chmod +x ./render-build.sh && ./render-build.sh
+    startCommand: node server.cjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: "0.0.0.0"
+      # Add your AI provider keys under Environment in the Render dashboard:
+      # OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.

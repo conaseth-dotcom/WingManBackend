@@ -1,0 +1,27 @@
+{
+  "en_GB-alan-low.onnx": "Alan (Low, UK English)",
+  "en_GB-alan-medium.onnx": "Alan (Medium, UK English)",
+  "en_GB-alba-medium.onnx": "Alba (Medium, UK English)",
+  "en_GB-aru-medium.onnx": "Aru (Medium, UK English)",
+  "en_GB-northern_english_male-medium.onnx": "Northern English Male (Medium)",
+  "en_GB-southern_english_female-low.onnx": "Southern English Female (Low)",
+  "en_GB-vctk-medium.onnx": "VCTK (Medium, UK English)",
+
+  "en_US-amy-low.onnx": "Amy (Low, US English)",
+  "en_US-amy-medium (1).onnx": "Amy (Medium, US English)",
+  "en_US-amy-medium.onnx": "Amy (Medium, US English)",
+  "en_US-arctic-medium.onnx": "Arctic (Medium, US English)",
+  "en_US-bryce-medium.onnx": "Bryce (Medium, US English)",
+  "en_US-danny-low.onnx": "Danny (Low, US English)",
+  "en_US-hfc_female-medium.onnx": "HFC Female (Medium, US English)",
+  "en_US-libritts_r-medium.onnx": "LibriTTS-R (Medium, US English)",
+  "en_US-ljspeech-high.onnx": "LJSpeech (High, US English)",
+  "en_US-ljspeech-medium.onnx": "LJSpeech (Medium, US English)",
+  "en_US-norman-medium.onnx": "Norman (Medium, US English)",
+  "en_US-ryan-high.onnx": "Ryan (High, US English)",
+  "en_US-ryan-low.onnx": "Ryan (Low, US English)",
+  "en_US-ryan-medium.onnx": "Ryan (Medium, US English)",
+  "en_US-sam-medium.onnx": "Sam (Medium, US English)",
+
+  "uk_UA-lada-x_low.onnx": "Lada (Low, Ukrainian)"
+}

@@ -1,0 +1,135 @@
+# ========================================================================
+# WingMan Backend File (TXT)
+# 
+# Alias: @backend-blackbox/BlackBoxKioskMap.txt
+# Role: Developer reference map for BlackBox subsystem structure.
+#
+# Notes:
+#   - Not imported by runtime.
+#   - Safe to modify without affecting build.
+# ========================================================================
+
+
+BlackBox/
+│
+├── app.cjs
+│   Entry point for BlackBox runtime. Loads relationship engine,
+│   initializes context, and prepares the AI for interaction.
+│
+├── main.cjs
+│   High-level orchestration. Connects BlackBox to WingMan backend,
+│   loads relationship model, and prepares runtime environment.
+│
+├── start.cjs
+│   Bootstraps BlackBox when launched standalone. Used for testing
+│   and development outside the full WingMan environment.
+│
+├── BlackBoxKioskMap.txt
+│   This file — conceptual map of the BlackBox subsystem.
+│
+│
+├── blackbox.gateway.cjs   ← NEW
+│   The SAFE, GOVERNED interface between BlackBox and WingMan.
+│   BlackBox cannot touch the notebook, settings, or access system
+│   except through this file. Enforces token permissions.
+│
+├── blackbox.autonomy.cjs  ← NEW
+│   The AUTONOMY GOVERNOR. Manages:
+│     - task queue
+│     - cooldowns
+│     - user-priority interrupts
+│     - token lifecycle
+│   Ensures BlackBox never overwhelms itself or the system.
+│
+│
+├── message/
+│   Handles message routing inside BlackBox.
+│   │
+│   ├── message-router.cjs
+│   │   Routes internal messages between subsystems.
+│   │
+│   └── index.cjs
+│       Entry point for message subsystem.
+│
+│
+├── relationship/
+│   The core AI personality + reasoning engine.
+│   Contains the entire relationship model, ethics, memory,
+│   onboarding, flow, and all normalization + validation logic.
+│
+│   ├── index.cjs
+│   │   Loads the relationship model and exposes it to runtime.
+│   │
+│   ├── relationship.config.json
+│   ├── relationship.index.json
+│
+│   ├── build/
+│   │   └── build-relationship.cjs
+│   │       Compiles the relationship model into runtime form.
+│
+│   ├── core/
+│   │   JSON files defining the AI’s personality, ethics,
+│   │   communication style, memory structure, onboarding flow,
+│   │   priorities, and collaboration patterns.
+│   │
+│   │   (profile.json, ethics.json, memory.json, etc.)
+│
+│   ├── merge/
+│   │   Logic for merging relationship fragments into a unified model.
+│
+│   ├── normalizers/
+│   │   Ensures all relationship JSON files follow expected schema.
+│
+│   ├── runtime/
+│   │   The active reasoning engine:
+│   │     - bootstrap
+│   │     - context loader
+│   │     - onboarding
+│   │     - legacy compatibility
+│   │
+│   ├── state/
+│   │   AI’s internal state snapshots, preferences, and history.
+│
+│   └── validators/
+│       Schema validators for every relationship component.
+│
+│
+└── ui/
+    Console-based UI for debugging and development.
+    │
+    ├── console-interface.cjs
+    └── index.cjs
+
+
+============================================================
+ HIGH-LEVEL FLOW
+============================================================
+
+User → WingMan UI → Backend Routes → Token Gateway → BlackBoxGateway → BlackBoxAutonomy → Relationship Engine
+
+- BlackBoxGateway = the AI’s “hands” (safe, governed)
+- BlackBoxAutonomy = the AI’s “nervous system regulator”
+- Relationship Engine = the AI’s “mind”
+- Notebook = the AI’s “memory substrate”
+- Settings Assistant = the AI’s “personality governor”
+- Access System = the AI’s “security clearance”
+- Token Gateway = the AI’s “keycard system”
+
+
+============================================================
+ NOTES
+============================================================
+
+• BlackBox can now act autonomously, but only through the gateway.
+• User activity always interrupts autonomous tasks.
+• BlackBox cannot escalate its own permissions.
+• All notebook + settings actions require token validation.
+• This kiosk map will expand again when we add:
+    - blackbox.runtime.cjs
+    - blackbox.thinking.cjs
+    - blackbox.memory.adapter.cjs
+    - blackbox.voice.adapter.cjs
+
+============================================================
+ END OF MAP
+============================================================

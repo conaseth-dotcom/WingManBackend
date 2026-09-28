@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+
+  "description": "Core access rules for WingMan. These rules define what the AI may do, what requires user approval, and what is strictly prohibited. The Access Pipeline enforces these rules at runtime.",
+
+  "rules": {
+    "read": {
+      "userPartition": true,
+      "sharedPartition": true,
+      "aiPartition": true,
+      "realProject": false
+    },
+
+    "write": {
+      "userPartition": false,
+      "sharedPartition": true,
+      "aiPartition": true,
+      "realProject": false
+    },
+
+    "promote": {
+      "allowed": false,
+      "requiresUserApproval": true
+    },
+
+    "merge": {
+      "allowed": true,
+      "requiresUserApproval": true
+    },
+        
+    "tokens": {
+      "requireValidToken": true,
+      "tokenScopes": [
+        "session",
+        "project",
+        "relationship"
+      ]
+    },
+
+    "logging": {
+      "accessEvents": true,
+      "tokenUsage": true,
+      "permissionViolations": true
+    },
+
+    "prohibited": {
+      "directRealProjectModification": true,
+      "bypassingReview": true,
+      "bypassingMerge": true,
+      "selfElevation": true,
+      "writingOutsidePartitions": true
+    }
+  }
+}

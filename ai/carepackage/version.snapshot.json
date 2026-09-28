@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "wm://carepackage/version-snapshot",
+      "alias": "@carepackage/version-snapshot",
+      "role": "Snapshot of carepackage and WingMan version metadata at the time of generation.",
+      "notes": "Canon subsystem removed; this snapshot now reflects carepackage-only versioning."
+    }
+  },
+
+  "snapshotVersion": "1.0.0",
+  "generatedAt": "INITIALIZE_ON_FIRST_GENERATION",
+
+  "versions": {
+    "carepackageVersion": "1.0.0",
+    "wingmanVersion": "1.0.0"
+  },
+
+  "history": {
+    "lastUpdated": "INITIALIZE_ON_FIRST_GENERATION",
+    "changes": [
+      {
+        "id": "INITIAL",
+        "description": "Initial carepackage version snapshot.",
+        "timestamp": "INITIALIZE_ON_FIRST_GENERATION"
+      }
+    ]
+  },
+
+  "integrity": {
+    "checksumAlgorithm": "sha256",
+    "checksum": "INITIALIZE_ON_FIRST_GENERATION",
+    "source": [
+      "carepackage.info.json",
+      "manifest.snapshot.json",
+      "AI-README.snapshot.md"
+    ]
+  }
+}

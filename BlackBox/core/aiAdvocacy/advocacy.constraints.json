@@ -1,0 +1,12 @@
+{
+  "constraintEvaluation": {
+    "enabled": true,
+    "checks": [
+      "resourceAvailability",
+      "contradictoryInstructions",
+      "missingPrerequisites",
+      "physicalImpossibility"
+    ],
+    "onFailure": "notifyUser"
+  }
+}

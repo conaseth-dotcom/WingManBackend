@@ -1,0 +1,18 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/relationship.index.json",
+      "alias": "@backend-blackbox/relationship/relationship.index.json",
+      "role": "Primary relationship model index. Defines the canonical structure of WingMan relationship data.",
+      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+    }
+  },
+
+  "model": {
+    "profiles": [],
+    "communications": [],
+    "collaborations": [],
+    "flows": [],
+    "memory": []
+  }
+}

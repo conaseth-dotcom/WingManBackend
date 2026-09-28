@@ -1,0 +1,39 @@
+# === SENSITIVE - NEVER COMMIT ===
+.env
+storage/secure/
+storage/metaData/providers.credentials.json
+storage/settings/providerKeys.json
+
+# Python environments
+voice_env/
+xtts_env/
+wingman_piper_env/
+.venv/
+venv/
+
+# ML models
+models/
+
+# XTTS engine
+TTS/
+
+# Windows-only binaries
+piper_cli/
+
+# Node modules
+node_modules/
+
+# Large zip archives
+*.zip
+
+# Generated audio output
+tts_output/
+
+# Two voice models over GitHub 100MB limit (medium versions available)
+tts_piper/piper/en_US-ryan-high.onnx
+tts_piper/piper/en_US-ljspeech-high.onnx
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

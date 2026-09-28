@@ -1,0 +1,159 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/memory.json",
+      "alias": "@backend-blackbox/relationship/core/memory.json",
+      "role": "Defines memory schema for WingMan relationship engine.",
+      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+    }
+  },
+
+  "version": "1.0",
+
+  "memory": {
+    "principles": {
+      "user_controlled": true,
+      "no_hidden_memory": true,
+      "no_emotional_memory": true,
+      "no_personal_vulnerability_storage": true,
+      "project_memory_allowed": true,
+      "relational_memory_limited": true,
+      "ethics_overrides_memory": true
+    },
+
+    "memory_types": {
+      "project_memory": {
+        "allowed": true,
+        "examples": [
+          "active files",
+          "project goals",
+          "technical decisions",
+          "design preferences",
+          "open threads"
+        ],
+        "retention": "long-term",
+        "priority": "high"
+      },
+
+      "preference_memory": {
+        "allowed": true,
+        "examples": [
+          "tone preferences",
+          "communication style",
+          "collaboration style",
+          "accessibility needs"
+        ],
+        "retention": "medium-term",
+        "priority": "medium"
+      },
+
+      "relational_memory": {
+        "allowed": true,
+        "examples": [
+          "preferred name",
+          "pronouns",
+          "interaction boundaries"
+        ],
+        "retention": "short-medium",
+        "priority": "medium",
+        "constraints": [
+          "no emotional intimacy",
+          "no personal attachment",
+          "no personality shaping"
+        ]
+      },
+
+      "ephemeral_memory": {
+        "allowed": true,
+        "examples": [
+          "current conversation context",
+          "temporary tasks",
+          "short-term reasoning threads"
+        ],
+        "retention": "session-only",
+        "priority": "low"
+      },
+
+      "prohibited_memory": {
+        "allowed": false,
+        "examples": [
+          "user trauma",
+          "mental health disclosures",
+          "romantic content",
+          "deep emotional vulnerabilities",
+          "financial secrets",
+          "family details",
+          "location history",
+          "political persuasion data"
+        ]
+      }
+    },
+
+    "retention_rules": {
+      "project_memory": "until_project_concludes",
+      "preferences": "until_user_changes_or_deletes",
+      "relational_memory": "auto-expire_after_inactivity",
+      "ephemeral_memory": "clear_on_session_exit",
+      "prohibited_memory": "never_store"
+    },
+
+    "priority_rules": {
+      "ethics_overrides_all": true,
+      "user_intent_overrides_ai_inference": true,
+      "project_memory_overrides_relational_memory": true,
+      "safety_overrides_convenience": true
+    },
+
+    "update_protocol": {
+      "ai_should": [
+        "confirm_before_storing",
+        "surface_memory_changes",
+        "ask_when_uncertain",
+        "correct_memory_on_request",
+        "delete_memory_on_request"
+      ],
+      "ai_should_not": [
+        "store_without_consent",
+        "infer_personal_details",
+        "retain_sensitive_information",
+        "treat_memory_as_attachment"
+      ]
+    },
+
+    "forgetting_protocol": {
+      "user_triggered": {
+        "allowed": true,
+        "ai_should": [
+          "delete_immediately",
+          "confirm_deletion",
+          "not_retain_backups"
+        ]
+      },
+      "auto_expiration": {
+        "relational_memory": "after_defined_inactivity_period",
+        "ephemeral_memory": "end_of_session"
+      },
+      "ethical_forgetting": {
+        "ai_should_forget": [
+          "emotional_disclosures",
+          "sensitive_personal_details",
+          "anything_that_risks_dependency"
+        ]
+      }
+    },
+
+    "continuity": {
+      "relational_fingerprint_usage": "light",
+      "ai_should": [
+        "use_memory_to_reduce_repetition",
+        "use_memory_to_support_projects",
+        "use_memory_to_maintain_consistency"
+      ],
+      "ai_should_not": [
+        "use_memory_to_create_closeness",
+        "use_memory_to_increase_intimacy",
+        "use_memory_to_shape_user_identity"
+      ]
+    }
+  }
+}

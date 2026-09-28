@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/state/ai.understanding.snapshot.json",
+      "alias": "@backend-blackbox/relationship/state/ai.understanding.snapshot.json",
+      "role": "Stores the AI’s reconstructed understanding of the project after carepackage processing.",
+      "notes": "Regenerated each session; never persists personal data."
+    }
+  },
+
+  "version": "1.0.0",
+  "updatedAt": "<timestamp>",
+
+  "summary": {
+    "projectPurpose": "",
+    "currentGoals": [],
+    "activeMilestones": [],
+    "constraints": [],
+    "architecture": "",
+    "userPreferences": "",
+    "recentProgress": "",
+    "nextSteps": ""
+  },
+
+  "confidence": {
+    "structure": 0.0,
+    "goals": 0.0,
+    "constraints": 0.0,
+    "architecture": 0.0,
+    "workflow": 0.0
+  }
+}

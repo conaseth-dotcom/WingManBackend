@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "wm://carepackage/info",
+      "alias": "@carepackage/info",
+      "role": "Describes the structure, contents, integrity, and compatibility requirements of the WingMan carepackage.",
+      "notes": "Carepackage metadata; used by AI clients to validate completeness and compatibility."
+    }
+  },
+
+  "carepackageVersion": "1.0.0",
+  "generatedAt": "INITIALIZE_ON_FIRST_GENERATION",
+  "wingmanVersion": "1.0.0",
+
+  "contents": {
+    "bundle": "manifest.bundle.json",
+    "manifestSnapshot": "manifest.snapshot.json",
+    "readmeSnapshot": "AI-README.snapshot.md",
+    "versionSnapshot": "version.snapshot.json",
+    "protocol": "meta/ai.entry.protocol.md",
+    "instructions": "meta/delivery.instructions.md"
+  },
+
+  "integrity": {
+    "checksumAlgorithm": "sha256",
+    "checksum": "INITIALIZE_ON_FIRST_GENERATION"
+  },
+
+  "compatibility": {
+    "requiresWingmanCore": "1.0.0",
+    "notes": "This file describes the structure and integrity of the carepackage delivered to AI clients."
+  }
+}

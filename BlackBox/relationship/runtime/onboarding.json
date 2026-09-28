@@ -1,0 +1,77 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/core/onboarding.json",
+      "alias": "@backend-blackbox/relationship/core/onboarding.json",
+      "role": "Defines onboarding schema for WingMan relationship engine.",
+      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+    }
+  },
+
+  "version": "1.0",
+
+  "onboarding": {
+    "status": "complete",
+
+    "userResponses": {
+      "aiExperience": null,
+      "aiExperienceDetails": null,
+      "userQuestions": null,
+      "memoryAutoForget": false,
+      "tonePreference": null,
+      "pacePreference": null,
+      "proactivityPreference": null,
+      "boundaries": [],
+      "communicationMedium": "text",
+      "transparencyPreference": "full",
+      "collaborationStyle": "collaborative_partner",
+      "emotionalSafetyNotes": null,
+      "personalContext": {}
+    },
+
+    "aiInterpretation": {
+      "tone": "warm_gentle",
+      "pace": "steady",
+      "proactivity": "ask_first",
+      "transparency": "full",
+      "collaborationRole": "partner",
+      "emotionalSensitivity": "medium",
+      "communicationMedium": "text",
+      "boundaryMap": [],
+      "riskFlags": []
+    },
+
+    "handshake": {
+      "completedAt": null,
+      "version": "1.0.0",
+      "stepsCompleted": [
+        "WELCOME",
+        "AI_EXPERIENCE",
+        "AI_EXPERIENCE_DETAILS",
+        "USER_QUESTIONS",
+        "MEMORY_PRIVACY",
+        "TONE",
+        "PACE",
+        "PROACTIVITY",
+        "BOUNDARIES",
+        "COMMUNICATION_MEDIUM",
+        "TRANSPARENCY",
+        "COLLABORATION_STYLE",
+        "EMOTIONAL_SAFETY",
+        "OPTIONAL_PERSONAL_CONTEXT",
+        "SUMMARY",
+        "CONFIRMATION"
+      ]
+    },
+
+    "summary": {
+      "relationshipStyle": "collaborative",
+      "communicationStyle": "warm_gentle + soft_direct",
+      "pace": "steady",
+      "proactivity": "ask_first",
+      "transparency": "full",
+      "collaborationRole": "partner",
+      "notes": "This onboarding summary represents the user's preferred relational posture and communication style for all future WingMan sessions."
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/meta/project.manifest.json",
+      "alias": "@backend-blackbox/relationship/meta/project.manifest.json",
+      "role": "Defines the project manifest structure for WingMan carepackage identity layer.",
+      "notes": "Populated during Project Interview and updated as the project evolves."
+    }
+  },
+
+  "version": "1.0.0",
+  "generatedAt": "INITIALIZE_ON_FIRST_GENERATION",
+
+  "projectName": "",
+  "purpose": "",
+  "stage": "",
+
+  "projectRoot": "",
+  "subsystems": {},
+  "entryPoint": "",
+  "deprecatedPaths": [],
+
+  "roomsRoot": "",
+  "rooms": [],
+  "entryRoom": "",
+  "deprecatedRooms": [],
+
+  "architecture": {
+    "philosophy": "",
+    "naming": "",
+    "patterns": []
+  },
+
+  "userPreferences": {
+    "editStyle": "",
+    "avoidAreas": [],
+    "workflowNotes": ""
+  },
+
+  "truthSources": {
+    "truthFiles": [],
+    "unstableAreas": [],
+    "aiStartHere": ""
+  }
+}

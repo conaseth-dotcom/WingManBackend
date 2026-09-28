@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/core/access/access.rules.json",
+      "alias": "@backend-core/access/access.rules.json",
+      "role": "Defines access control rules for WingMan core subsystems, including AI entry permissions.",
+      "notes": "Loaded by core/access to determine minimum access levels for privileged operations."
+    }
+  },
+
+  "ai.enter": {
+    "minLevel": 6,
+    "description": "Allow AI to enter WingMan DMZ."
+  }
+}

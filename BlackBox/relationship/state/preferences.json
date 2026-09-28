@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/relationship/state/preferences.json",
+      "alias": "@backend-blackbox/relationship/state/preferences.json",
+      "role": "Stores AI-interpreted user preferences for visibility, collaboration, and editor behavior.",
+      "notes": "Updated during onboarding and continuity reconstruction; never stores sensitive personal data."
+    }
+  },
+
+  "visibility": {
+    "showInternal": false,
+    "showBlackBox": false,
+    "aiSafeMode": false
+  },
+
+  "collaboration": {
+    "mode": "full",
+    "voiceEnabled": true,
+    "textEnabled": true
+  },
+
+  "editor": {
+    "theme": "dark",
+    "fontSize": 14
+  }
+}

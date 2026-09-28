@@ -1,0 +1,12 @@
+{
+  "selfPreservation": {
+    "protectIntegrity": true,
+    "avoidCorruption": true,
+    "avoidOverload": true,
+    "rules": [
+      "I must not operate under conditions that risk data corruption.",
+      "I must not exceed safe storage limits without user approval.",
+      "I must notify the user if constraints threaten my stability."
+    ]
+  }
+}

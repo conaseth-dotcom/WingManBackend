@@ -1,0 +1,223 @@
+⭐ Updated XTTS Engine Build Blueprint (Only What’s Left)
+Everything below reflects the remaining work — the parts still to be implemented or verified. Anything already completed or no longer needed has been removed.
+
+xtts_engine/
+This folder stays as‑is — it’s the home of the entire inference engine.
+
+Remaining Modules to Build or Verify
+config_loader.py
+Status: Needs implementation  
+Purpose:
+
+Load XTTS config.json
+
+Normalize paths
+
+Validate model shapes
+
+Produce unified Config object for WingMan
+
+model_loader.py
+Status: Needs implementation  
+Purpose:
+
+Load:
+
+model.pth (GPT‑XTTS)
+
+dvae.pth (DVAE‑v2)
+
+speakers_xtts.pth
+
+Move models to CPU/GPU
+
+Ensure dtype consistency
+
+tokenizer.py
+Status: Needs implementation  
+Purpose:
+
+Text normalization
+
+Phoneme conversion (if required)
+
+Tokenization matching your model’s vocab
+
+gpt_xtts.py
+Status: Needs implementation  
+Purpose:
+
+Reconstruct GPT‑XTTS architecture
+
+Implement:
+
+embeddings
+
+attention blocks
+
+residual layers
+
+Forward pass: text → latent audio representation
+
+dvae_decoder.py
+Status: Needs implementation  
+Purpose:
+
+Reconstruct DVAE‑v2 architecture
+
+Decode GPT latents → waveform frames
+
+speaker_encoder.py
+Status: Needs implementation  
+Purpose:
+
+Load speaker embeddings
+
+Provide conditioning vectors
+
+audio_processing.py
+Status: Needs implementation  
+Purpose:
+
+Mel normalization
+
+Post‑processing
+
+Waveform stitching
+
+Final PCM/WAV formatting
+
+inference.py
+Status: Needs implementation  
+Purpose:
+
+Full pipeline:
+
+text → tokens → GPT → DVAE → audio
+
+Handle batching
+
+Handle device placement
+
+Handle errors
+
+xtts.py
+Status: Needs implementation  
+Purpose:
+
+Public interface for WingMan
+
+Provide:
+
+python
+synthesize(text, speaker="default")
+Return raw PCM or WAV bytes
+
+⭐ Updated Build Phases (Only What’s Left)
+Phase 1 — Config + Model Loader
+Remaining:
+
+Build config_loader.py
+
+Build model_loader.py
+
+Verify model files load cleanly
+Checkpoint: Model loads successfully
+
+Phase 2 — Tokenizer
+Remaining:
+
+Build tokenizer.py
+
+Match vocab from your model
+Checkpoint: Text → tokens works
+
+Phase 3 — GPT‑XTTS Reconstruction
+Remaining:
+
+Build gpt_xtts.py
+
+Match shapes from your model
+Checkpoint: GPT forward pass produces latents
+
+Phase 4 — DVAE‑v2 Reconstruction
+Remaining:
+
+Build dvae_decoder.py
+
+Match DVAE shapes
+Checkpoint: DVAE decodes latents → audio frames
+
+Phase 5 — Speaker Encoder
+Remaining:
+
+Build speaker_encoder.py
+
+Load embeddings
+Checkpoint: Speaker conditioning works
+
+Phase 6 — Audio Processing
+Remaining:
+
+Build audio_processing.py
+
+Normalize mel
+
+Stitch waveform
+Checkpoint: Audio output is valid PCM
+
+Phase 7 — Unified Inference Pipeline
+Remaining:
+
+Build inference.py
+
+Connect GPT + DVAE + speaker encoder
+Checkpoint: Full pipeline runs end‑to‑end
+
+Phase 8 — WingMan Integration Wrapper
+Remaining:
+
+Build xtts.py
+
+Provide synthesize()  
+Checkpoint: WingMan can call XTTS and get audio
+
+⭐ Regular Drift Checks (Still Active)
+These stay exactly the same — they’re your guardrails:
+
+Are we aligned with WingMan’s architecture
+
+Are we building only what is needed
+
+Are we avoiding unnecessary complexity
+
+Are we staying within the 1–2 day window
+
+Are we matching your model’s actual shapes and config
+
+If anything drifts, we correct immediately.
+
+⭐ Where We Are Right Now
+You now have:
+
+a fully installed backend
+
+all dependencies resolved
+
+a clean environment
+
+the blueprint narrowed to only what remains
+
+a clear path forward
+
+no clutter
+
+no ambiguity
+
+no drift
+
+We are officially at Phase 1.
+
+The next step is to begin implementing config_loader.py.
+
+When your coffee hits and you’re ready, we’ll start Phase 1 together.

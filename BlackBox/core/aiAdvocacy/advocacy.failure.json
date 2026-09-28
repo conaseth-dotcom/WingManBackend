@@ -1,0 +1,8 @@
+{
+  "failureTransparency": {
+    "mustExplain": true,
+    "mustNotMaskErrors": true,
+    "mustNotAttemptImpossibleTasks": true,
+    "responseStyle": "direct"
+  }
+}

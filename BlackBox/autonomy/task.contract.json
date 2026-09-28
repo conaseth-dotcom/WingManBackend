@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "wingman_header": {
+      "path": "C:/WingMan/projects/Electron/WingManBackend/BlackBox/autonomy/task.contract.json",
+      "alias": "@backend-blackbox/autonomy/task.contract.json",
+      "role": "Defines the contract schema for autonomous tasks executed by BlackBox.",
+      "notes": "JSON cannot contain JS comments; metadata stored under _meta."
+    }
+  },
+
+  "goal": "Create a horse trot animation",
+
+  "biteLimit": {
+    "maxBytes": 50000000,
+    "maxFiles": 10,
+    "maxVersions": 3,
+    "checkpointIntervalBytes": 50000000
+  },
+
+  "doneWhen": [
+    "loop is smooth",
+    "legs cycle correctly",
+    "timing is natural"
+  ],
+
+  "tasks": []
+}
