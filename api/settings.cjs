@@ -110,5 +110,25 @@ router.get("/all", (req, res) => {
   console.log("[SettingsAPI] READ ALL success");
   return res.json({ ok: true, result: all });
 });
+// ------------------------------------------------------------
+// GET /api/settings
+// Base settings endpoint expected by the launcher
+// ------------------------------------------------------------
+router.get("/", (req, res) => {
+  try {
+    const versionData = require(path.join(__dirname, "..", "public", "version.json"));
+
+    res.json({
+      ok: true,
+      version: versionData.version,
+      partitionRequired: true,
+      continuityRequired: true,
+      message: "WingMan backend settings OK"
+    });
+  } catch (err) {
+    console.error("[SettingsAPI] Failed to load version.json:", err);
+    res.status(500).json({ ok: false, error: "version.json missing or unreadable" });
+  }
+});
 
 module.exports = router;
