@@ -31,89 +31,49 @@ const path = require("path");
 // ------------------------------------------------------------
 // Load Settings (dynamic partition root)
 // ------------------------------------------------------------
+// ------------------------------------------------------------
+// Load Settings (dynamic partition root)
+// ------------------------------------------------------------
 function loadSettings() {
   try {
-    const raw = fs.readFileSync("C:/WingManBackend/settings/settings.json", "utf8");
-    return JSON.parse(raw);
+    // Prefer launcher-provided settings file if present
+    const settingsPath =
+      process.env.WINGMAN_SETTINGS_PATH ||
+      path.join(process.cwd(), "settings", "settings.json");
+
+    if (fs.existsSync(settingsPath)) {
+      const raw = fs.readFileSync(settingsPath, "utf8");
+      return JSON.parse(raw);
+    }
+
+    return {}; // safe fallback
   } catch {
     return {}; // safe fallback
   }
 }
 
-/**
- * Normalize a path:
- * - resolve relative segments
- * - convert backslashes → forward slashes
- * - remove trailing slashes
- */
-function normalizePath(p) {
-  if (!p) return "";
-  return path.resolve(p).replace(/\\/g, "/").replace(/\/+$/, "");
-}
-
-/**
- * Ensure a directory exists (mkdir -p behavior)
- */
-function ensureDir(dirPath) {
-  const normalized = normalizePath(dirPath);
-  if (!fs.existsSync(normalized)) {
-    fs.mkdirSync(normalized, { recursive: true });
-  }
-}
-
-/**
- * Safe file copy:
- * - ensures destination directory exists
- * - overwrites by default
- */
-function copyFileSafe(src, dest) {
-  const normalizedSrc = normalizePath(src);
-  const normalizedDest = normalizePath(dest);
-
-  ensureDir(path.dirname(normalizedDest));
-  fs.copyFileSync(normalizedSrc, normalizedDest);
-}
-
-/**
- * Recursively list all files in a directory
- */
-function listFilesRecursive(root) {
-  const normalizedRoot = normalizePath(root);
-  const results = [];
-
-  function walk(dir) {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = normalizePath(path.join(dir, entry.name));
-
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else {
-        results.push(fullPath);
-      }
-    }
-  }
-
-  if (fs.existsSync(normalizedRoot)) {
-    walk(normalizedRoot);
-  }
-
-  return results;
-}
-
-// ------------------------------------------------------------
-// Dynamic Partition Root (Settings‑compliant)
-// ------------------------------------------------------------
 const settings = loadSettings();
 
-// Fallback if Settings are missing or corrupted
-const DEFAULT_ROOT = "D:/WingManPartition";
+// ------------------------------------------------------------
+// Partition Root Resolution (NO absolute paths)
+// ------------------------------------------------------------
 
-// Use Settings if available
+// Launcher always sets this when spawning backend
+const envRoot = process.env.WINGMAN_PARTITION_ROOT;
+
+// If settings.json contains a partitionRoot, use it
+const settingsRoot = settings.partitionRoot;
+
+// Final fallback if nothing else is available
+const DEFAULT_ROOT = path.join(process.cwd(), "WingManPartition");
+
+// Final resolved root
 const PARTITION_ROOT = normalizePath(
-  settings.partitionRoot ?? DEFAULT_ROOT
+  envRoot ??
+  settingsRoot ??
+  DEFAULT_ROOT
 );
+
 
 // ------------------------------------------------------------
 // Core roots

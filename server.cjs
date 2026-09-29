@@ -36,89 +36,98 @@ console.log("ENV LOADED:", process.env.ENV);
 
   // ─── System Metadata Loader ───────────────────────────────────────────────────
   const { loadSystemMetadata } = require(r('core/system/system.metadata.loader.cjs'));
+// ─── App + server ───────────────────────────────────────────────────────────
+const app    = express();
+const server = http.createServer(app);
 
-  // ─── App + server ───────────────────────────────────────────────────────────
-  const app    = express();
-  const server = http.createServer(app);
+console.log("[WM-SERVER] Express app + HTTP server created");
 
-  console.log("[WM-SERVER] Express app + HTTP server created");
+// ─── Event bus ──────────────────────────────────────────────────────────────
+class WingManEventBus extends EventEmitter {}
+const eventBus = new WingManEventBus();
+eventBus.setMaxListeners(100);
+app.locals.eventBus = eventBus;
 
-  // ─── Event bus ──────────────────────────────────────────────────────────────
-  class WingManEventBus extends EventEmitter {}
-  const eventBus = new WingManEventBus();
-  eventBus.setMaxListeners(100);
-  app.locals.eventBus = eventBus;
+console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
 
-  console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
+// ─── Logger ─────────────────────────────────────────────────────────────────
+let logger;
+try {
+  console.log("[WM-LOGGER] Attempting to load ai/lib/logger…");
+  logger = require(r('ai/lib/logger')).default || require(r('ai/lib/logger'));
+  console.log("[WM-LOGGER] ai/lib/logger loaded successfully");
+} catch (e) {
+  console.log("[WM-LOGGER] ai/lib/logger unavailable, falling back to console logger:", e.message);
+  const ts  = () => new Date().toISOString();
+  const fmt = (lvl, msg, meta) =>
+    `[${ts()}] [${lvl.toUpperCase()}] ${msg}${meta ? ' ' + JSON.stringify(meta) : ''}`;
+  logger = {
+    info  : (m, x) => console.log (fmt('info',  m, x)),
+    warn  : (m, x) => console.warn (fmt('warn',  m, x)),
+    error : (m, x) => console.error(fmt('error', m, x)),
+    debug : (m, x) => console.debug(fmt('debug', m, x)),
+  };
+}
+app.locals.logger = logger;
+logger.info('WingMan Orchestrator booting…');
 
-  // ─── Logger ─────────────────────────────────────────────────────────────────
-  let logger;
+// ─── Config ─────────────────────────────────────────────────────────────────
+const CONFIG = (() => {
   try {
-    console.log("[WM-LOGGER] Attempting to load ai/lib/logger…");
-    logger = require(r('ai/lib/logger')).default || require(r('ai/lib/logger'));
-    console.log("[WM-LOGGER] ai/lib/logger loaded successfully");
+    console.log("[WM-CONFIG] Attempting to load core/state…");
+    const mod = require(r('core/state.cjs'));
+    const cfg = mod.default || mod;
+    console.log("[WM-CONFIG] core/state loaded");
+    return cfg;
   } catch (e) {
-    console.log("[WM-LOGGER] ai/lib/logger unavailable, falling back to console logger:", e.message);
-    const ts  = () => new Date().toISOString();
-    const fmt = (lvl, msg, meta) =>
-      `[${ts()}] [${lvl.toUpperCase()}] ${msg}${meta ? ' ' + JSON.stringify(meta) : ''}`;
-    logger = {
-      info  : (m, x) => console.log (fmt('info',  m, x)),
-      warn  : (m, x) => console.warn (fmt('warn',  m, x)),
-      error : (m, x) => console.error(fmt('error', m, x)),
-      debug : (m, x) => console.debug(fmt('debug', m, x)),
+    console.log("[WM-CONFIG] core/state unavailable, using ENV fallback:", e.message);
+    return {
+      PORT           : parseInt(process.env.PORT         || '4000', 10),
+      HOST           : process.env.HOST                  || '0.0.0.0',
+      ENV            : process.env.NODE_ENV              || 'production',
+      PARTITION_ROOT : process.env.PARTITION_ROOT
     };
   }
-  app.locals.logger = logger;
-  logger.info('WingMan Orchestrator booting…');
+})();
 
-  // ─── Config ─────────────────────────────────────────────────────────────────
-  const CONFIG = (() => {
-    try {
-      console.log("[WM-CONFIG] Attempting to load core/state…");
-      const mod = require(r('core/state.cjs'));
-      const cfg = mod.default || mod;
-      console.log("[WM-CONFIG] core/state loaded");
-      return cfg;
-    } catch (e) {
-      console.log("[WM-CONFIG] core/state unavailable, using ENV fallback:", e.message);
-      return {
-        PORT           : parseInt(process.env.PORT         || '4000', 10),
-        HOST           : process.env.HOST                  || '0.0.0.0',
-        ENV            : process.env.NODE_ENV              || 'production',
+app.locals.config = CONFIG;
+logger.info('Config loaded', { port: CONFIG.PORT, env: CONFIG.ENV });
+console.log("[WM-CONFIG] Effective config:", CONFIG);
 
-        // Removed XTTS_PORT and WHISPER_PORT (TTS/STT no longer backend services)
+// ─── Middleware ─────────────────────────────────────────────────────────────
+console.log("[WM-MW] Registering middleware stack…");
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: true, credentials: true }));
+app.use(compression());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(morgan(CONFIG.ENV === 'production' ? 'combined' : 'dev', {
+  stream: { write: msg => logger.info(msg.trim()) },
+}));
+console.log("[WM-MW] Middleware stack registered");
 
-        PARTITION_ROOT : process.env.PARTITION_ROOT
-      };
-    }
-  })();
+// ─── Health / readiness ─────────────────────────────────────────────────────
+app.locals.ready = false;
+app.get('/health', (_req, res) =>
+  res.json({ status: 'ok', uptime: process.uptime() })
+);
+app.get('/ready', (_req, res) =>
+  res.json({ status: app.locals.ready ? 'ready' : 'booting' })
+);
+console.log("[WM-ROUTE] Health + readiness routes mounted");
 
-  app.locals.config = CONFIG;
-  logger.info('Config loaded', { port: CONFIG.PORT, env: CONFIG.ENV });
-  console.log("[WM-CONFIG] Effective config:", CONFIG);
-
-  // ─── Middleware ─────────────────────────────────────────────────────────────
-  console.log("[WM-MW] Registering middleware stack…");
-  app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors({ origin: true, credentials: true }));
-  app.use(compression());
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-  app.use(morgan(CONFIG.ENV === 'production' ? 'combined' : 'dev', {
-    stream: { write: msg => logger.info(msg.trim()) },
-  }));
-  console.log("[WM-MW] Middleware stack registered");
-
-  // ─── Health / readiness ─────────────────────────────────────────────────────
-  app.locals.ready = false;
-  app.get('/health', (_req, res) =>
-    res.json({ status: 'ok', uptime: process.uptime() })
-  );
-  app.get('/ready', (_req, res) =>
-    res.json({ status: app.locals.ready ? 'ready' : 'booting' })
-  );
-  console.log("[WM-ROUTE] Health + readiness routes mounted");
+// ─── Version route (dynamic version for launcher) ───────────────────────────
+app.get('/version', (req, res) => {
+  try {
+    const versionData = require(path.join(__dirname, "public", "version.json"));
+    console.log("[WM-ROUTE] /version served:", versionData);
+    res.json(versionData);
+  } catch (err) {
+    console.error("[WM-ROUTE] /version failed:", err.message);
+    res.status(500).json({ error: "version.json missing or unreadable" });
+  }
+});
+console.log("[WM-ROUTE] Version route mounted");
 
   // ─── AI stack ───────────────────────────────────────────────────────────────
   logger.info('Phase — AI Stack…');

@@ -8,7 +8,7 @@ console.log(">>> [WM-BACKEND] continuity.handlers.cjs loaded");
 
 const fs = require("fs");
 const path = require("path");
-const { Paths } = require("../core/paths/paths.cjs");
+const { Paths } = require("../paths/paths.cjs");
 
 // Load continuity gateway
 function loadGateway() {
