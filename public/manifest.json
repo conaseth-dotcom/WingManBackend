@@ -1,0 +1,106 @@
+{
+  "packets": [
+    { "id": "packet.001.01", "path": "packet_001.01" },
+    { "id": "packet.001.02", "path": "packet_001.02" },
+    { "id": "packet.001.03", "path": "packet_001.03" },
+    { "id": "packet.001.04", "path": "packet_001.04" },
+    { "id": "packet.001.05", "path": "packet_001.05" },
+
+    { "id": "packet.002.01", "path": "packet_002.01" },
+    { "id": "packet.002.02", "path": "packet_002.02" },
+    { "id": "packet.002.03", "path": "packet_002.03" },
+    { "id": "packet.002.04", "path": "packet_002.04" },
+    { "id": "packet.002.05", "path": "packet_002.05" },
+    { "id": "packet.002.06", "path": "packet_002.06" },
+    { "id": "packet.002.07", "path": "packet_002.07" },
+    { "id": "packet.002.08", "path": "packet_002.08" },
+    { "id": "packet.002.09", "path": "packet_002.09" },
+    { "id": "packet.002.10", "path": "packet_002.10" },
+    { "id": "packet.002.11", "path": "packet_002.11" },
+
+    { "id": "packet.003.01", "path": "packet_003.01" },
+    { "id": "packet.003.02", "path": "packet_003.02" },
+    { "id": "packet.003.03", "path": "packet_003.03" },
+    { "id": "packet.003.04", "path": "packet_003.04" },
+    { "id": "packet.003.05", "path": "packet_003.05" },
+    { "id": "packet.003.06", "path": "packet_003.06" },
+    { "id": "packet.003.07", "path": "packet_003.07" },
+
+    { "id": "packet.004.01", "path": "packet_004.01" },
+    { "id": "packet.004.02", "path": "packet_004.02" },
+    { "id": "packet.004.03", "path": "packet_004.03" },
+    { "id": "packet.004.04", "path": "packet_004.04" },
+    { "id": "packet.004.05", "path": "packet_004.05" },
+
+    { "id": "packet.005.01", "path": "packet_005.01" },
+    { "id": "packet.005.02", "path": "packet_005.02" },
+    { "id": "packet.005.03", "path": "packet_005.03" },
+
+    { "id": "packet.006.01", "path": "packet_006.01" },
+
+    { "id": "packet.006.02.01", "path": "packet_006.02.01" },
+    { "id": "packet.006.02.02", "path": "packet_006.02.02" },
+    { "id": "packet.006.02.03", "path": "packet_006.02.03" },
+    { "id": "packet.006.02.04", "path": "packet_006.02.04" },
+    { "id": "packet.006.02.05", "path": "packet_006.02.05" },
+    { "id": "packet.006.02.06", "path": "packet_006.02.06" },
+    { "id": "packet.006.02.07", "path": "packet_006.02.07" },
+    { "id": "packet.006.02.08", "path": "packet_006.02.08" },
+    { "id": "packet.006.02.09", "path": "packet_006.02.09" },
+
+    { "id": "packet.006.03P", "path": "packet_006.03P" },
+    { "id": "packet.006.04", "path": "packet_006.04" },
+
+    { "id": "packet.007.01", "path": "packet_007.01" },
+    { "id": "packet.007.02", "path": "packet_007.02" },
+    { "id": "packet.007.03", "path": "packet_007.03" },
+
+    { "id": "packet.007.04.01", "path": "packet_007.04.01" },
+    { "id": "packet.007.04.02", "path": "packet_007.04.02" },
+    { "id": "packet.007.04.03", "path": "packet_007.04.03" },
+    { "id": "packet.007.04.04", "path": "packet_007.04.04" },
+    { "id": "packet.007.04.05", "path": "packet_007.04.05" },
+    { "id": "packet.007.04.06", "path": "packet_007.04.06" },
+    { "id": "packet.007.04.07", "path": "packet_007.04.07" },
+    { "id": "packet.007.04.08", "path": "packet_007.04.08" },
+    { "id": "packet.007.04.09", "path": "packet_007.04.09" },
+    { "id": "packet.007.04.10", "path": "packet_007.04.10" },
+    { "id": "packet.007.04.11", "path": "packet_007.04.11" },
+    { "id": "packet.007.04.12", "path": "packet_007.04.12" },
+
+    { "id": "packet.007.05", "path": "packet_007.05" },
+    { "id": "packet.007.06", "path": "packet_007.06" },
+
+    { "id": "packet.008.01", "path": "packet_008.01" },
+    { "id": "packet.008.02", "path": "packet_008.02" },
+    { "id": "packet.008.03", "path": "packet_008.03" },
+    { "id": "packet.008.04", "path": "packet_008.04" },
+
+    { "id": "packet.009.01", "path": "packet_009.01" },
+    { "id": "packet.009.02", "path": "packet_009.02" },
+    { "id": "packet.009.03", "path": "packet_009.03" },
+    { "id": "packet.009.04", "path": "packet_009.04" },
+    { "id": "packet.009.05", "path": "packet_009.05" },
+
+    { "id": "packet.010.01", "path": "packet_010.01" },
+    { "id": "packet.010.02", "path": "packet_010.02" },
+    { "id": "packet.010.03", "path": "packet_010.03" },
+    { "id": "packet.010.04", "path": "packet_010.04" },
+
+    { "id": "packet.011.01", "path": "packet_011.01" },
+    { "id": "packet.011.02", "path": "packet_011.02" },
+
+    { "id": "packet.012.01", "path": "packet_012.01" },
+    { "id": "packet.012.02", "path": "packet_012.02" },
+
+    { "id": "packet.013.01", "path": "packet_013.01" },
+    { "id": "packet.013.02", "path": "packet_013.02" },
+
+    { "id": "packet.014.01", "path": "packet_014.01" },
+    { "id": "packet.014.02", "path": "packet_014.02" },
+
+    { "id": "packet.015.01", "path": "packet_015.01" },
+
+    { "id": "packet.016.01", "path": "packet_016.01" }
+  ]
+}
