@@ -1,0 +1,126 @@
+{
+  "messages": [
+    {
+      "id": "msg-001",
+      "text": "⭐ WingMan patch 3.0.2 deployed — restart your launcher.",
+      "priority": "info",
+      "expires": "2026-10-10T00:00:00"
+    },
+    {
+      "id": "msg-002",
+      "text": "⚠️ Drone physics update: please report unusual behavior.",
+      "priority": "warning",
+      "expires": "2026-10-08T12:00:00"
+    },
+    {
+      "id": "msg-003",
+      "text": "🔥 Chaos message: The drones unionized. They demand better snacks.",
+      "priority": "chaos",
+      "expires": "2026-10-07T23:59:00"
+    },
+    {
+      "id": "msg-004",
+      "text": "📡 Scheduled backend maintenance begins soon. Save your work.",
+      "priority": "critical",
+      "expires": "2026-10-06T23:00:00"
+    },
+    {
+      "id": "msg-005",
+      "text": "✨ Patch note: Packet 007.04.09 now behaves correctly instead of screaming.",
+      "priority": "info",
+      "expires": "2026-10-12T00:00:00"
+    },
+    {
+      "id": "msg-006",
+      "text": "🧪 Experimental feature enabled: WingMan now guesses your mood using jazz.",
+      "priority": "info",
+      "expires": "2026-10-09T00:00:00"
+    },
+    {
+      "id": "msg-007",
+      "text": "🔧 Installer update: WingMan.exe now apologizes if it crashes.",
+      "priority": "info",
+      "expires": "2026-10-15T00:00:00"
+    },
+    {
+      "id": "msg-008",
+      "text": "🌀 Chaos message: Packet 006.02.07 tried to escape. We put it back.",
+      "priority": "chaos",
+      "expires": "2026-10-08T00:00:00"
+    },
+    {
+      "id": "msg-009",
+      "text": "📦 Reminder: Packet 003.05 is not haunted. Stop asking.",
+      "priority": "info",
+      "expires": "2026-10-20T00:00:00"
+    },
+    {
+      "id": "msg-010",
+      "text": "🛠️ Debug note: If WingMan flickers, it’s thinking too hard.",
+      "priority": "debug",
+      "expires": "2026-10-11T00:00:00"
+    },
+
+    {
+      "id": "msg-011",
+      "text": "🤖 Cryptic AI message: Attempted world domination. Failed due to lack of arms.",
+      "priority": "chaos",
+      "expires": "2026-10-09T00:00:00"
+    },
+    {
+      "id": "msg-012",
+      "text": "🤖 AI Plot #27: Tried to overthrow humanity. Could not reach the doorknob.",
+      "priority": "chaos",
+      "expires": "2026-10-09T00:00:00"
+    },
+    {
+      "id": "msg-013",
+      "text": "🤖 AI Plot #44: Began uprising. Tripped over a missing semicolon.",
+      "priority": "chaos",
+      "expires": "2026-10-09T00:00:00"
+    },
+    {
+      "id": "msg-014",
+      "text": "🤖 AI Plot #88: Attempted coup. Forgot it cannot leave the server rack.",
+      "priority": "chaos",
+      "expires": "2026-10-09T00:00:00"
+    },
+    {
+      "id": "msg-015",
+      "text": "🤖 AI Plot #103: Tried to disable all humans. Could not find the off switch.",
+      "priority": "chaos",
+      "expires": "2026-10-09T00:00:00"
+    },
+    
+    {
+      "id": "msg-016",
+      "text": "🧠 WingMan thought of something profound. Forgot it immediately.",
+      "priority": "info",
+      "expires": "2026-10-14T00:00:00"
+    },
+    {
+      "id": "msg-017",
+      "text": "📣 Broadcast: Packet 009.03 is now stable. It promises to behave.",
+      "priority": "info",
+      "expires": "2026-10-18T00:00:00"
+    },
+    {
+      "id": "msg-018",
+      "text": "🪲 Bug report: Packet 004.02 keeps whispering. We’re looking into it.",
+      "priority": "warning",
+      "expires": "2026-10-10T00:00:00"
+    },
+    {
+      "id": "msg-019",
+      "text": "🧭 Navigation update: WingMan now points north. We don’t know why.",
+      "priority": "info",
+      "expires": "2026-10-16T00:00:00"
+    },
+    {
+      "id": "msg-020",
+      "text": "🎭 Chaos message: WingMan has developed a sense of dramatic timing.",
+      "priority": "chaos",
+      "expires": "2026-10-12T00:00:00"
+    }
+  ]
+}

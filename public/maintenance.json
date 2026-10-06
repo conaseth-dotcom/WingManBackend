@@ -1,0 +1,8 @@
+{
+    "active": true,
+    "type": "scheduled",
+    "startTime": "2026-10-03T02:00:00",
+    "durationMinutes": 15,
+    "message": "Backend maintenance begins soon. Please save your work.",
+    "priority": "critical"
+}

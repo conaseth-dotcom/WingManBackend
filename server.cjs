@@ -4,7 +4,7 @@
 
 (async () => {
   console.log(">>> [WM-SERVER] BACKEND INSTANCE: server.cjs booting…");
-
+  
   const path        = require('path');
   const http        = require('http');
   const express     = require('express');
@@ -13,6 +13,7 @@
   const morgan      = require('morgan');
   const compression = require('compression');
   const EventEmitter = require('events');
+  const fs          = require('fs');
 
   // ─── Root + helpers ─────────────────────────────────────────────────────────
   const ROOT = path.resolve(__dirname);          // C:/WingManBackend
@@ -128,6 +129,21 @@ app.get('/version', (req, res) => {
   }
 });
 console.log("[WM-ROUTE] Version route mounted");
+
+// ─── WingMan UI Bundle Delivery ─────────────────────────────────────────────
+app.get('/wingman-ui-bundle.zip', (req, res) => {
+  const bundlePath = path.join(__dirname, "public", "wingman-ui-bundle.zip");
+
+  console.log("[WM-ROUTE] /wingman-ui-bundle.zip requested");
+
+  if (!fs.existsSync(bundlePath)) {
+    console.error("[WM-ROUTE] UI bundle missing:", bundlePath);
+    return res.status(404).json({ error: "UI bundle not found" });
+  }
+
+  res.sendFile(bundlePath);
+});
+console.log("[WM-ROUTE] UI bundle route mounted");
 
   // ─── AI stack ───────────────────────────────────────────────────────────────
   logger.info('Phase — AI Stack…');
