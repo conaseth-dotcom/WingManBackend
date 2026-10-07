@@ -32,6 +32,46 @@ function normalizePath(p) {
   if (!p) return "";
   return path.resolve(p).replace(/\\/g, "/").replace(/\/+$/, "");
 }
+function ensureDir(dirPath) {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+  } catch (err) {
+    // Silent fail is fine for partition boot
+  }
+}
+
+function copyFileSafe(src, dest) {
+  try {
+    ensureDir(path.dirname(dest));
+    fs.copyFileSync(src, dest);
+  } catch (err) {
+    // Silent fail is fine for partition boot
+  }
+}
+
+function listFilesRecursive(rootDir) {
+  const results = [];
+
+  function walk(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else {
+        results.push(fullPath);
+      }
+    }
+  }
+
+  try {
+    walk(rootDir);
+  } catch {
+    // Safe fallback
+  }
+
+  return results;
+}
 
 // ------------------------------------------------------------
 // Load Settings (dynamic partition root)
