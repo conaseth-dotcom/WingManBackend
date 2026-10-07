@@ -28,6 +28,11 @@
 const fs = require("fs");
 const path = require("path");
 
+function normalizePath(p) {
+  if (!p) return "";
+  return path.resolve(p).replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
 // ------------------------------------------------------------
 // Load Settings (dynamic partition root)
 // ------------------------------------------------------------
