@@ -584,18 +584,21 @@ try {
 }
 
 
-  // ─── Final bind ─────────────────────────────────────────────────────────────
+    // ─── Final bind ─────────────────────────────────────────────────────────────
   const BOOT_END = Date.now();
   const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
+
   logger.info('WingMan Backend ready', {
     port: CONFIG.PORT,
     env: CONFIG.ENV,
     bootMs
   });
+
   console.log("[WM-SERVER] Backend ready:", { port: CONFIG.PORT, env: CONFIG.ENV, bootMs });
 
   app.locals.ready = true;
 
+  // Render-compatible port binding
   const PORT = process.env.PORT || CONFIG.PORT || 10000;
   const HOST = "0.0.0.0";
 
@@ -604,8 +607,5 @@ try {
     console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
   });
 
-    logger.info(`HTTP server listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
-    console.log(`[WM-SERVER] HTTP server listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
-  });
+})();   // END OF ASYNC WRAPPER
 
-})();
