@@ -26,8 +26,7 @@
 
   // Load the REAL .env file
   require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-console.log("ENV LOADED:", process.env.ENV);
-
+  console.log("ENV LOADED:", process.env.ENV);
 
   console.log("[WM-SERVER] ROOT resolved:", ROOT);
 
@@ -37,19 +36,19 @@ console.log("ENV LOADED:", process.env.ENV);
 
   // ─── System Metadata Loader ───────────────────────────────────────────────────
   const { loadSystemMetadata } = require(r('core/system/system.metadata.loader.cjs'));
-// ─── App + server ───────────────────────────────────────────────────────────
-const app    = express();
-const server = http.createServer(app);
+  // ─── App + server ───────────────────────────────────────────────────────────
+  const app    = express();
+  const server = http.createServer(app);
 
-console.log("[WM-SERVER] Express app + HTTP server created");
+  console.log("[WM-SERVER] Express app + HTTP server created");
 
-// ─── Event bus ──────────────────────────────────────────────────────────────
-class WingManEventBus extends EventEmitter {}
-const eventBus = new WingManEventBus();
-eventBus.setMaxListeners(100);
-app.locals.eventBus = eventBus;
+  // ─── Event bus ──────────────────────────────────────────────────────────────
+  class WingManEventBus extends EventEmitter {}
+  const eventBus = new WingManEventBus();
+  eventBus.setMaxListeners(100);
+  app.locals.eventBus = eventBus;
 
-console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
+  console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
 
 // ─── Logger ─────────────────────────────────────────────────────────────────
 let logger;
@@ -582,7 +581,6 @@ try {
   logger.warn('TTS API unavailable (expected — backend TTS removed)', { err: e.message });
   console.log("[WM-API] Backend TTS API intentionally disabled:", e.message);
 }
-
 
     // ─── Final bind ─────────────────────────────────────────────────────────────
   const BOOT_END = Date.now();
