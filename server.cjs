@@ -26,7 +26,8 @@
 
   // Load the REAL .env file
   require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-  console.log("ENV LOADED:", process.env.ENV);
+console.log("ENV LOADED:", process.env.ENV);
+
 
   console.log("[WM-SERVER] ROOT resolved:", ROOT);
 
@@ -36,19 +37,19 @@
 
   // ─── System Metadata Loader ───────────────────────────────────────────────────
   const { loadSystemMetadata } = require(r('core/system/system.metadata.loader.cjs'));
-  // ─── App + server ───────────────────────────────────────────────────────────
-  const app    = express();
-  const server = http.createServer(app);
+// ─── App + server ───────────────────────────────────────────────────────────
+const app    = express();
+const server = http.createServer(app);
 
-  console.log("[WM-SERVER] Express app + HTTP server created");
+console.log("[WM-SERVER] Express app + HTTP server created");
 
-  // ─── Event bus ──────────────────────────────────────────────────────────────
-  class WingManEventBus extends EventEmitter {}
-  const eventBus = new WingManEventBus();
-  eventBus.setMaxListeners(100);
-  app.locals.eventBus = eventBus;
+// ─── Event bus ──────────────────────────────────────────────────────────────
+class WingManEventBus extends EventEmitter {}
+const eventBus = new WingManEventBus();
+eventBus.setMaxListeners(100);
+app.locals.eventBus = eventBus;
 
-  console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
+console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
 
 // ─── Logger ─────────────────────────────────────────────────────────────────
 let logger;
@@ -105,6 +106,13 @@ app.use(morgan(CONFIG.ENV === 'production' ? 'combined' : 'dev', {
   stream: { write: msg => logger.info(msg.trim()) },
 }));
 console.log("[WM-MW] Middleware stack registered");
+// ─── Static file hosting for launcher (manifest, messages, version, maintenance) ───
+app.use(express.static(path.join(__dirname, "public")));
+app.get('/messages.json', (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "messages.json"));
+});
+
+console.log("[WM-STATIC] Static /public folder mounted");
 
 // ─── Health / readiness ─────────────────────────────────────────────────────
 app.locals.ready = false;
@@ -582,21 +590,19 @@ try {
   console.log("[WM-API] Backend TTS API intentionally disabled:", e.message);
 }
 
-    // ─── Final bind ─────────────────────────────────────────────────────────────
+
+  // ─── Final bind ─────────────────────────────────────────────────────────────
   const BOOT_END = Date.now();
   const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
-
   logger.info('WingMan Backend ready', {
     port: CONFIG.PORT,
     env: CONFIG.ENV,
     bootMs
   });
-
   console.log("[WM-SERVER] Backend ready:", { port: CONFIG.PORT, env: CONFIG.ENV, bootMs });
 
   app.locals.ready = true;
 
-  // Render-compatible port binding
   const PORT = process.env.PORT || CONFIG.PORT || 10000;
   const HOST = "0.0.0.0";
 
@@ -605,5 +611,8 @@ try {
     console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
   });
 
-})();   // END OF ASYNC WRAPPER
+    logger.info(`HTTP server listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
+    console.log(`[WM-SERVER] HTTP server listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
+  });
 
+();
