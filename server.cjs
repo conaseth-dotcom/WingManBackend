@@ -553,15 +553,14 @@ console.log("[WM-ROUTE] UI bundle route mounted");
       res.json({ ok: false, error: err.message });
     }
   });
-
   // ─── AI context reload route ────────────────────────────────────────────────
   console.log("[WM-AI] Registering /api/ai/reload route…");
   app.post('/api/ai/reload', async (_req, res) => {
     console.log("[WM-AI] /api/ai/reload invoked");
     try {
       const env = enterWingMan({
-      systemMetadata: app.locals.systemMetadata
-    });
+        systemMetadata: app.locals.systemMetadata
+      });
 
       if (env && env.ok) {
         app.locals.aiContext = env.context;
@@ -580,38 +579,58 @@ console.log("[WM-ROUTE] UI bundle route mounted");
     }
   });
 
- // ─── TTS API (Removed — now handled in frontend) ───────────────────────────────
-try {
+  // ─── TTS API (Removed — now handled in frontend) ─────────────────────────────
   console.log("[WM-API] Skipping backend TTS API — TTS now handled in frontend.");
-  // No backend TTS module to load.
-  // No safeMount call needed.
-} catch (e) {
-  logger.warn('TTS API unavailable (expected — backend TTS removed)', { err: e.message });
-  console.log("[WM-API] Backend TTS API intentionally disabled:", e.message);
-}
-// ─── Final bind ─────────────────────────────────────────────────────────────
-const BOOT_END = Date.now();
-const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
 
-logger.info('WingMan Backend ready', {
-  port: process.env.PORT || CONFIG.PORT,
-  env: CONFIG.ENV,
-  bootMs
-});
-console.log("[WM-SERVER] Backend ready:", {
-  port: process.env.PORT || CONFIG.PORT,
-  env: CONFIG.ENV,
-  bootMs
-});
+  // ─── Launcher Config Bundle (manifest, messages, version, maintenance, URL map) ───
+  console.log("[WM-ROUTE] Registering /api/launcher/config route…");
+  app.get('/api/launcher/config', (req, res) => {
+    try {
+      const base = path.join(__dirname, "public");
 
-app.locals.ready = true;
+      const manifest    = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
+      const messages    = JSON.parse(fs.readFileSync(path.join(base, "messages.json"), "utf8"));
+      const version     = JSON.parse(fs.readFileSync(path.join(base, "version.json"), "utf8"));
+      const maintenance = JSON.parse(fs.readFileSync(path.join(base, "maintenance.json"), "utf8"));
+      const urlMap      = JSON.parse(fs.readFileSync(path.join(base, "backend_URL_map.json"), "utf8"));
 
-// Render MUST use process.env.PORT — no fallback to 10000
-const PORT = process.env.PORT || CONFIG.PORT;
-const HOST = "0.0.0.0";
+      res.json({
+        ok: true,
+        manifest,
+        messages,
+        version,
+        maintenance,
+        urlMap
+      });
+    } catch (err) {
+      console.error("[WM-ROUTE] /api/launcher/config failed:", err.message);
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+  console.log("[WM-ROUTE] Launcher config bundle route mounted");
 
-server.listen(PORT, HOST, () => {
-  logger.info(`HTTP server listening on http://${HOST}:${PORT}`);
-  console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
-});
+  // ─── Final bind ─────────────────────────────────────────────────────────────
+  const BOOT_END = Date.now();
+  const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
 
+  logger.info('WingMan Backend ready', {
+    port: process.env.PORT || CONFIG.PORT,
+    env: CONFIG.ENV,
+    bootMs
+  });
+  console.log("[WM-SERVER] Backend ready:", {
+    port: process.env.PORT || CONFIG.PORT,
+    env: CONFIG.ENV,
+    bootMs
+  });
+
+  app.locals.ready = true;
+
+  // Render MUST use process.env.PORT — no fallback to 10000
+  const PORT = process.env.PORT || CONFIG.PORT;
+  const HOST = "0.0.0.0";
+
+  server.listen(PORT, HOST, () => {
+    logger.info(`HTTP server listening on http://${HOST}:${PORT}`);
+    console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
+  });
