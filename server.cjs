@@ -589,30 +589,29 @@ try {
   logger.warn('TTS API unavailable (expected — backend TTS removed)', { err: e.message });
   console.log("[WM-API] Backend TTS API intentionally disabled:", e.message);
 }
+// ─── Final bind ─────────────────────────────────────────────────────────────
+const BOOT_END = Date.now();
+const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
 
+logger.info('WingMan Backend ready', {
+  port: process.env.PORT || CONFIG.PORT,
+  env: CONFIG.ENV,
+  bootMs
+});
+console.log("[WM-SERVER] Backend ready:", {
+  port: process.env.PORT || CONFIG.PORT,
+  env: CONFIG.ENV,
+  bootMs
+});
 
-  // ─── Final bind ─────────────────────────────────────────────────────────────
-  const BOOT_END = Date.now();
-  const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
-  logger.info('WingMan Backend ready', {
-    port: CONFIG.PORT,
-    env: CONFIG.ENV,
-    bootMs
-  });
-  console.log("[WM-SERVER] Backend ready:", { port: CONFIG.PORT, env: CONFIG.ENV, bootMs });
+app.locals.ready = true;
 
-  app.locals.ready = true;
+// Render MUST use process.env.PORT — no fallback to 10000
+const PORT = process.env.PORT || CONFIG.PORT;
+const HOST = "0.0.0.0";
 
-  const PORT = process.env.PORT || CONFIG.PORT || 10000;
-  const HOST = "0.0.0.0";
+server.listen(PORT, HOST, () => {
+  logger.info(`HTTP server listening on http://${HOST}:${PORT}`);
+  console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
+});
 
-  server.listen(PORT, HOST, () => {
-    logger.info(`HTTP server listening on http://${HOST}:${PORT}`);
-    console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
-  });
-
-    logger.info(`HTTP server listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
-    console.log(`[WM-SERVER] HTTP server listening on http://${CONFIG.HOST}:${CONFIG.PORT}`);
-  });
-
-();
