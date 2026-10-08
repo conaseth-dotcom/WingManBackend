@@ -634,3 +634,4 @@ console.log("[WM-ROUTE] UI bundle route mounted");
     logger.info(`HTTP server listening on http://${HOST}:${PORT}`);
     console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
   });
+// WM-BACKEND: heartbeat marker for redeploy
