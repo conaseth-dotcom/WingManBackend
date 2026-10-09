@@ -1,5 +1,6 @@
 {
   "packets": [
+    { "id": "000.01", "path": "WingMan" }
     { "id": "001.01", "path": "packet_001.01" },
     { "id": "001.02", "path": "packet_001.02" },
     { "id": "001.03", "path": "packet_001.03" },
