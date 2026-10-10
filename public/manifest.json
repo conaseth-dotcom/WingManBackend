@@ -1,4 +1,5 @@
 {
+  "releaseBase": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0",
   "packets": [
     { "id": "000.01", "path": "WingMan" },
     { "id": "001.01", "path": "packet_001.01" },
