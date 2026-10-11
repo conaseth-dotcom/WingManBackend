@@ -2,6 +2,7 @@
   "releaseBase": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0",
   "packets": [
     { "id": "000.01", "path": "WingMan" },
+
     { "id": "001.01", "path": "packet_001.01" },
     { "id": "001.02", "path": "packet_001.02" },
     { "id": "001.03", "path": "packet_001.03" },
@@ -17,7 +18,7 @@
     { "id": "002.07", "path": "packet_002.07" },
     { "id": "002.08", "path": "packet_002.08" },
     { "id": "002.09", "path": "packet_002.09" },
-    
+
     { "id": "003.01", "path": "packet_003.01" },
     { "id": "003.02", "path": "packet_003.02" },
     { "id": "003.03", "path": "packet_003.03" },
@@ -44,23 +45,16 @@
     { "id": "006.02.05", "path": "packet_006.02.05" },
     { "id": "006.02.06", "path": "packet_006.02.06" },
     { "id": "006.02.09", "path": "packet_006.02.09" },
-    { "id": "006.03.01", "path": "packet_006.03" },
+
+    { "id": "006.03", "path": "packet_006.03" },
     { "id": "006.04", "path": "packet_006.04" },
 
     { "id": "007.01", "path": "packet_007.01" },
     { "id": "007.02", "path": "packet_007.02" },
     { "id": "007.03", "path": "packet_007.03" },
-    { "id": "007.04.02", "path": "packet_007.04.02" },
-    { "id": "007.04.03", "path": "packet_007.04.03" },
-    { "id": "007.04.04", "path": "packet_007.04.04" },
-    { "id": "007.04.05", "path": "packet_007.04.05" },
-    { "id": "007.04.06", "path": "packet_007.04.06" },
-    { "id": "007.04.07", "path": "packet_007.04.07" },
-    { "id": "007.04.08", "path": "packet_007.04.08" },
-    { "id": "007.04.09", "path": "packet_007.04.09" },
-    { "id": "007.04.10", "path": "packet_007.04.10" },
-    { "id": "007.04.11", "path": "packet_007.04.11" },
+
     { "id": "007.04.12", "path": "packet_007.04.12" },
+
     { "id": "007.05", "path": "packet_007.05" },
     { "id": "007.06", "path": "packet_007.06" },
 
