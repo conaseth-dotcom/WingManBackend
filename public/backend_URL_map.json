@@ -4,8 +4,6 @@
     "manifest": "manifest.json",
     "version": "version.json",
     "maintenance": "maintenance.json",
-    "messages": "messages.json",
-    "installer": "WingMan.exe",
-    "packets": {}
+    "messages": "messages.json"
   }
 }
