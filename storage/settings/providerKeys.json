@@ -1,0 +1,94 @@
+{
+  "openai": {
+    "defaultKey": 0,
+    "keys": [
+      {
+        "nickname": "Work",
+        "key": "sk-xxxx"
+      },
+      {
+        "nickname": "Personal",
+        "key": "sk-yyyy"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "75b11f37-1ce6-4312-9988-4a4e1b38fd4c"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "6fb68318-3aa0-4aa7-979b-d38567394a2d"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "712a0a73-4a31-4345-9fa2-a10a5c0092c5"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "750177f4-bbf2-4509-8d88-1d8540d80a27"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "e0f8fb0b-7180-4414-b777-b823fd206360"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "ca702878-bb76-4cf2-83b7-9071b4837252"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "fb52dbe2-af9b-4651-81fa-f7eea29cf426"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "8d868747-ce56-49ab-8d07-e00328310e32"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "60aa12f6-e4b4-49ec-9f27-de8dca0711bd"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "fc8ac708-bd6b-4505-938a-ed1ffb20f286"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "bcb6c610-6118-44cb-bea0-d033aa084f44"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "271893ce-e8a2-4f24-bc36-b1a815dedcaa"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "c688daa5-3544-4334-9988-e933eadba050"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "2d9a801d-0052-4dc7-9b1a-598b86430df4",
+        "orgId": null,
+        "projectId": null
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "27f3af92-af2e-485b-8831-c33ccc1d8eb8",
+        "orgId": null,
+        "projectId": null
+      }
+    ]
+  },
+  "anthropic": {
+    "defaultKey": 0,
+    "keys": [
+      {
+        "nickname": "Sandbox",
+        "key": "ak-zzzz"
+      },
+      {
+        "nickname": "Creative Stuff",
+        "credentialId": "f506bb0b-cc97-4ac2-8ccc-46a6afb6e02f",
+        "orgId": null,
+        "projectId": null
+      }
+    ]
+  }
+}
