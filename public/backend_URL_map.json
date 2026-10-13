@@ -1,9 +1,0 @@
-{
-  "baseUrl": "https://wingmanbackend.onrender.com/",
-  "files": {
-    "manifest": "manifest.json",
-    "version": "version.json",
-    "maintenance": "maintenance.json",
-    "messages": "messages.json"
-  }
-}
