@@ -4,7 +4,7 @@
   "type": "module",
   "main": "BlackBox/main.cjs",
   "scripts": {
-    "postinstall": "node ./render-postinstall.js",
+    "postinstall": "node ./render-postinstall.cjs",
     "start": "node BlackBox/main.cjs"
   },
   "dependencies": {
