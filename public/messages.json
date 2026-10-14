@@ -18,8 +18,7 @@
       "priority": "chaos",
       "expires": "2026-10-01T00:00:00"
     },
-    {
-      "id": "msg-004",
+    {      "id": "msg-004",
       "text": "📡 Scheduled backend maintenance begins soon. Save your work.",
       "priority": "critical",
       "expires": "2026-10-06T23:00:00"
