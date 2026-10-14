@@ -4,7 +4,7 @@
   "type": "module",
   "main": "BlackBox/main.cjs",
   "scripts": {
-    "postinstall": "[ \"$RENDER\" = \"true\" ] && bash ./render-build.sh || true",
+    "postinstall": "node ./render-postinstall.js",
     "start": "node BlackBox/main.cjs"
       },
   "dependencies": {
