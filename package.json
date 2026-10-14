@@ -7,9 +7,6 @@
     "postinstall": "node ./render-postinstall.js",
     "start": "node BlackBox/main.cjs"
   },
-    "start": "node BlackBox/main.cjs"
-  },
-
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "@google/genai": "^2.12.0",
