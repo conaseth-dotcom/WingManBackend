@@ -1,8 +1,8 @@
 {
-  "releaseBase": "https://wingmanbackend.onrender.com/",
+  "releaseBase": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/",
   "app": {
     "id": "WingManApp",
-    "zip": "WingManApp.zip",
+    "zip": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/WingManApp.zip",
     "installPath": "WingMan"
   },
   "partition": {
