@@ -1,0 +1,30 @@
+{
+  "title": "WingMan Launcher",
+
+  "devMode": {
+    "showTerminals": false,
+    "backendWaitSeconds": 2,
+    "rendererWaitSeconds": 3
+  },
+
+  "paths": {
+    "backend": "backend",
+    "renderer": "renderer",
+    "electron": "wingman-electron-win32-x64"
+  },
+
+  "backend": {
+    "enabled": true,
+    "command": "node server.cjs"
+  },
+
+  "renderer": {
+    "enabled": false,
+    "command": "npm run dev"
+  },
+
+  "electron": {
+    "enabled": true,
+    "command": "WingMan.exe"
+  }
+}
