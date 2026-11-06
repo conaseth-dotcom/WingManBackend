@@ -172,7 +172,7 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
   try {
     const { messages, context } = await buildMessagesForSession(session, message, history);
 
-    const identity = loadAIIdentity();
+    const identity = await loadAIIdentity();
     applyPersonalityToMessages(identity, messages);
 
     const onboarding = context.onboarding;
@@ -288,7 +288,7 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
 
 /* ─── vision mode (personality-aware) ─────────────────────────── */
 async function vision({ imagePath }) {
-  const identity = loadAIIdentity();
+  const identity = await loadAIIdentity();
 
   const rawDescription = await describeImage(imagePath);
   const prompt = buildVisionPrompt(identity, rawDescription);

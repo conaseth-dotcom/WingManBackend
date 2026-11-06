@@ -1,5 +1,5 @@
 /* ========================================================================
-WingMan Backend File Alias: @backend-blackbox/app.cjs
+WingMan Backend File Alias: @backend-blackbox.app.cjs
 Role: BlackBox application wrapper. Coordinates initialization order,
 binds UI hooks, and exposes the BlackBox API surface.
 ========================================================================= */

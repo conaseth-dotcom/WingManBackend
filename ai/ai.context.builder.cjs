@@ -10,13 +10,13 @@ const fs = require("fs");
 const path = require("path");
 
 const { buildMemorySummaryPrompt } = require("./ai.memory.personality.cjs");
-const { createAISandbox } = require("../sandbox/ai.sandbox.cjs");
+const { createAISandbox } = require("./sandbox/ai.sandbox.cjs");
 
 /* ---------------------------------------------------------------------------
    Load Carepackage Files (Static AI Orientation Data)
 --------------------------------------------------------------------------- */
 function loadCarepackage() {
-  const base = "C:/WingManBackend/ai/carepackage";
+  const base = path.join(__dirname, "carepackage");
 
   const safeRead = (p, json = false) => {
     try {

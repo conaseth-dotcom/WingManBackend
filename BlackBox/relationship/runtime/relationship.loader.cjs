@@ -17,17 +17,6 @@ const path = require("path");
 const { loadRelationshipModel } = require("../index.cjs");
 
 /* ------------------------------------------------------------
-   Resolve REAL backend root
-   (Prevents Node from accidentally resolving into the stray
-    C:/WingManBackend/WingManBackend/ folder.)
------------------------------------------------------------- */
-
-const BACKEND_ROOT = "C:/WingManBackend";
-
-// ⭐ Removed duplicate __dirname declaration
-// CommonJS already provides __dirname automatically.
-
-/* ------------------------------------------------------------
    Load Relationship Config
 ------------------------------------------------------------ */
 async function loadRelationshipConfig(configURL) {
@@ -46,10 +35,10 @@ async function loadRelationshipConfig(configURL) {
       filePath = configURL;
     }
 
-    // Force resolution inside the REAL backend root
+    // Resolve relationship.config.json relative to this runtime directory
     filePath = path.resolve(
-      BACKEND_ROOT,
-      "BlackBox/relationship/relationship.config.json"
+      __dirname,
+      "../relationship.config.json"
     );
 
     // Read JSON

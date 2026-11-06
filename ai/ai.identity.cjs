@@ -48,7 +48,7 @@ async function loadAIIdentity() {
 
   // 2. Load unified relationship model (persona, tone, interaction rules)
   const relationship = await loadRelationshipConfig(
-    "file://C:/WingManBackend/BlackBox/relationship/relationship.config.json"
+    "relationship.config.json"
   );
 
   // 3. AI continuity notes (memory, scratch, long-term notes)

@@ -99,8 +99,11 @@ function loadRelationshipModel(rawModules) {
     preferences: continuity.writePreferences
   };
 
-  // 8. ATTACH RUNTIME LAYER
-  model.runtime = wingmanRuntime;
+  // 8. COMBINE MODEL-SPECIFIC AND SHARED RUNTIME FUNCTIONS
+  model.runtime = {
+    ...model.runtime,
+    ...wingmanRuntime
+  };
 
   return model;
 }
