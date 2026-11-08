@@ -11,6 +11,7 @@ const path = require("path");
 const { randomUUID } = require("crypto");
 
 const { buildAIContext } = require("./ai.context.builder.cjs");
+const { createAISandbox } = require("./sandbox/ai.sandbox.cjs");
 const OnboardingRuntime = require("../BlackBox/relationship/runtime/onboarding.cjs");
 
 const { applyPersonalityToMessages } = require("./ai.personality.cjs");
