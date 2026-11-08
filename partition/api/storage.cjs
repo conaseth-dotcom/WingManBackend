@@ -8,7 +8,10 @@ const path = require("path");
 
 // Deterministic path resolver
 const PartitionPaths = require("./partition.paths.cjs");
-const AdvocacyEngine = require("C:/WingManBackend/BlackBox/core/aiAdvocacy/advocacy.engine.cjs");
+const AdvocacyEngine = require(
+  "../../BlackBox/core/aiAdvocacy/advocacy.engine.cjs"
+);
+
 
 // ------------------------------------------------------------
 // Advocacy feasibility wrapper

@@ -649,6 +649,15 @@
     console.log("[WM-API] Settings API unavailable:", e.message);
   }
 
+    // ─── Voice Profile API ──────────────────────────────────────────────────────
+    try {
+      console.log("[WM-API] Loading api/voiceProfile.cjs…");
+      const voiceProfileAPI = require(r('api/voiceProfile.cjs'));
+      safeMount('/api/voice-profile', voiceProfileAPI, 'voice-profile-api');
+    } catch (e) {
+      logger.warn('Voice Profile API unavailable', { err: e.message });
+      console.log("[WM-API] Voice Profile API unavailable:", e.message);
+    }
   // Providers API
   try {
     console.log("[WM-API] Loading api/providers.cjs…");
