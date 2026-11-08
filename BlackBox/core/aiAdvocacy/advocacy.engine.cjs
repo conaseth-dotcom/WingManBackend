@@ -13,7 +13,7 @@ function loadJson(file) {
 }
 
 // Load all advocacy configs
-const base = `${dynamicBackendRoot}/aiAdvocacy`;
+const base = __dirname;
 
 
 const identity      = loadJson(path.join(base, "advocacy.identity.json"));

@@ -502,20 +502,35 @@
   }
 
   try {
-    partitionFS        = require(r('partition/api/partition.fs.cjs'));
-    partitionPaths     = require(r('partition/api/partition.paths.cjs'));
-    partitionMerge     = require(r('partition/api/partition.merge.cjs'));
-    partitionReview    = require(r('partition/api/partition.review.cjs'));
-    partitionValidator = require(r('partition/api/partition.validator.cjs'));
-    partitionSession   = require(r('partition/api/partition.session.cjs'));
-    partitionStorage   = require(r('partition/api/storage.cjs'));
+  const ss = {
+    partitionRoot:
+      CONFIG.PARTITION_ROOT ||
+      process.env.WINGMAN_PARTITION ||
+      "D:\\WingManPartition"
+  };
 
-    const ss = {
-      partitionRoot: CONFIG.PARTITION_ROOT || process.env.WINGMAN_PARTITION || "D:\\WingManPartition"
-    };
+  app.locals.systemSettings = app.locals.systemSettings || {};
+  app.locals.systemSettings.partitionRoot = ss.partitionRoot;
 
-    app.locals.systemSettings = app.locals.systemSettings || {};
-    app.locals.systemSettings.partitionRoot = ss.partitionRoot;
+  // Initialize canonical Partition paths before loading modules
+  // that may resolve Partition locations during import.
+  partitionPaths = require(r('partition/api/partition.paths.cjs'));
+
+  if (typeof partitionPaths.init === 'function') {
+    const result = partitionPaths.init({
+      logger,
+      systemSettings: app.locals.systemSettings
+    });
+
+    if (result instanceof Promise) await result;
+  }
+
+  partitionFS        = require(r('partition/api/partition.fs.cjs'));
+  partitionMerge     = require(r('partition/api/partition.merge.cjs'));
+  partitionReview    = require(r('partition/api/partition.review.cjs'));
+  partitionValidator = require(r('partition/api/partition.validator.cjs'));
+  partitionSession   = require(r('partition/api/partition.session.cjs'));
+  partitionStorage   = require(r('partition/api/storage.cjs'));
 
     if (typeof partitionManager?.init === 'function') {
       const result = partitionManager.init({ logger, systemSettings: app.locals.systemSettings });
