@@ -515,7 +515,6 @@
   // Initialize canonical Partition paths before loading modules
   // that may resolve Partition locations during import.
   partitionPaths = require(r('partition/api/partition.paths.cjs'));
-
   if (typeof partitionPaths.init === 'function') {
     const result = partitionPaths.init({
       logger,
@@ -524,7 +523,6 @@
 
     if (result instanceof Promise) await result;
   }
-
   partitionFS        = require(r('partition/api/partition.fs.cjs'));
   partitionMerge     = require(r('partition/api/partition.merge.cjs'));
   partitionReview    = require(r('partition/api/partition.review.cjs'));
@@ -539,11 +537,6 @@
 
     if (typeof partitionFS.init === 'function') {
       const result = partitionFS.init({ logger, systemSettings: app.locals.systemSettings });
-      if (result instanceof Promise) await result;
-    }
-
-    if (typeof partitionPaths.init === 'function') {
-      const result = partitionPaths.init({ logger, systemSettings: app.locals.systemSettings });
       if (result instanceof Promise) await result;
     }
 
