@@ -7,7 +7,7 @@ const fs   = require("fs");
 const path = require("path");
 
 // Deterministic path resolver
-const { PartitionPaths } = require("./partition.paths.cjs");
+const PartitionPaths = require("./partition.paths.cjs");
 const AdvocacyEngine = require("C:/WingManBackend/BlackBox/core/aiAdvocacy/advocacy.engine.cjs");
 
 // ------------------------------------------------------------
@@ -42,7 +42,10 @@ let STORAGE_ROOT = null;
 let PARTITION_SIZE_BYTES = null;
 
 function init({ logger, systemSettings }) {
-  STORAGE_ROOT = PartitionPaths.resolve("system/storage");
+  STORAGE_ROOT = path.join(
+    PartitionPaths.getSystemRoot(),
+    "storage"
+  );
   PARTITION_SIZE_BYTES = systemSettings.partitionSizeMB * 1024 * 1024;
 
   if (!fs.existsSync(STORAGE_ROOT)) {

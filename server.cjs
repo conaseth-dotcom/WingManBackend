@@ -79,7 +79,7 @@
         PORT           : parseInt(process.env.PORT         || '4000', 10),
         HOST           : process.env.HOST                  || '0.0.0.0',
         ENV            : process.env.NODE_ENV              || 'production',
-        PARTITION_ROOT : process.env.PARTITION_ROOT
+        _ROOT : process.env.PARTITION_ROOT
       };
     }
   })();
@@ -503,7 +503,7 @@
 
   try {
     partitionFS        = require(r('partition/api/partition.fs.cjs'));
-    partitionPaths     = require(r('partition/api/partition.paths.cjs')).default;
+    partitionPaths     = require(r('partition/api/partition.paths.cjs'));
     partitionMerge     = require(r('partition/api/partition.merge.cjs'));
     partitionReview    = require(r('partition/api/partition.review.cjs'));
     partitionValidator = require(r('partition/api/partition.validator.cjs'));
