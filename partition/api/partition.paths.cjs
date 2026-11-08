@@ -39,7 +39,11 @@ const PartitionPaths = {
   getSharedRoot:  () => rootJoin("shared"),
   getSystemRoot:  () => rootJoin("system"),
 
-  // Trays
+  // User voice profile
+  getUserVoiceRoot: () => rootJoin("user", "voice"),
+  getUserVoiceProfilePath: () =>
+    rootJoin("user", "voice", "wm.voiceProfile.json"),
+    // Trays
   getTraysRoot: () => rootJoin("user", "trays"),
 
   getTrayFolder: (trayId) => {
