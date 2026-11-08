@@ -8,7 +8,6 @@ const fs = require("fs");
 const path = require("path");
 
 const PartitionPaths = require("../partition/api/partition.paths.cjs");
-const PartitionStorage = require("../partition/api/storage.cjs");
 
 const router = express.Router();
 
@@ -25,6 +24,30 @@ function ensureVoiceDirectory() {
   return voiceRoot;
 }
 
+function loadProfileFile() {
+  const profilePath = PartitionPaths.getUserVoiceProfilePath();
+
+  if (!fs.existsSync(profilePath)) {
+    return {};
+  }
+
+  const raw = fs.readFileSync(profilePath, "utf8");
+  return JSON.parse(raw);
+}
+
+function saveProfileFile(profile) {
+  const profilePath = PartitionPaths.getUserVoiceProfilePath();
+  const temporaryPath = `${profilePath}.tmp`;
+
+  fs.writeFileSync(
+    temporaryPath,
+    JSON.stringify(profile, null, 2),
+    "utf8"
+  );
+
+  fs.renameSync(temporaryPath, profilePath);
+}
+
 // ------------------------------------------------------------
 // GET /api/voice-profile
 // Load the user's current Voice Wizard profile.
@@ -33,8 +56,7 @@ router.get("/", (_req, res) => {
   try {
     ensureVoiceDirectory();
 
-    const profilePath = PartitionPaths.getUserVoiceProfilePath();
-    const profile = PartitionStorage.loadJSON(profilePath, {});
+   const profile = loadProfileFile();
 
     return res.json({
       ok: true,
@@ -67,10 +89,7 @@ router.put("/", (req, res) => {
 
     ensureVoiceDirectory();
 
-    const profilePath = PartitionPaths.getUserVoiceProfilePath();
-
-    PartitionStorage.saveJSON(profilePath, profile);
-
+    saveProfileFile(profile);
     return res.json({
       ok: true
     });
