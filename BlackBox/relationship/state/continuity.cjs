@@ -10,7 +10,7 @@ console.log(">>> [WM-FILE-LOAD] continuity.cjs loaded");
 
 const fs = require("fs");
 const path = require("path");
-const { Paths } = require("../../core/paths/paths.cjs");
+const { Paths } = require("../../../partition/paths/paths.cjs");
 const { loadJSON } = require("../../../partition/api/storage.cjs");
 const writer = require("./continuity.writer.cjs");
 
