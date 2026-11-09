@@ -13,9 +13,9 @@ console.log(">>> [WM-FILE-LOAD] blackbox.runtime.cjs loaded");
 const { BlackBoxGate } = require("./blackbox.gateway.cjs");
 const { BlackBoxAutonomy } = require("./blackbox.autonomy.cjs");
 const RelationshipEngine = require("./relationship/runtime/index.cjs");
-const MessageRouter = require("./message/message-router.cjs");
+const { MessageRouter } = require("./message/message-router.cjs");
 const { BlackBoxThinking } = require("./blackbox.thinking.cjs");
-const { loadPermissions } = require("../core/settings/permissions.cjs");
+const { loadPermissions } = require("./core/settings/permissions.cjs");
 
 // ---------------------------------------------------------------------------
 // BlackBox Runtime

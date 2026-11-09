@@ -1,8 +1,8 @@
 // D:\WingMan\WingManBackend\BlackBox\relationship\state\continuity.writer.cjs
 
 const fs = require("fs");
-const { Paths } = require("C:/WingManBackend/core/paths/paths.cjs"); // if absolute; we can later make this relative
-const { loadJSON } = require("C:/WingManBackend/partition/api/storage.cjs");
+const { Paths } = require("../../../partition/paths/paths.cjs");
+const { loadJSON } = require("../../../partition/api/storage.cjs");
 
 function ensureFile(path, initialContent) {
   const dir = require("path").dirname(path);
