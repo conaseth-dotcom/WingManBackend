@@ -16,8 +16,85 @@
   const fs          = require('fs');
 
   // ─── Root + helpers ─────────────────────────────────────────────────────────
-  const ROOT = path.resolve(__dirname);          // C:/WingManBackend
+  const ROOT = path.resolve(__dirname);     
   const r    = (...parts) => path.join(ROOT, ...parts);
+  // Resolve the launcher-selected Partition for this backend session.
+  function resolveLauncherPartitionRoot() {
+    const appDataRoot = process.env.APPDATA;
+
+    if (!appDataRoot) {
+      console.warn(
+        "[PartitionDiscovery] APPDATA is unavailable. Launcher config cannot be resolved."
+      );
+      return null;
+    }
+
+    const launcherConfigPath = path.join(
+      appDataRoot,
+      "wingman-launcher",
+      "launcher.config.json"
+    );
+
+    if (!fs.existsSync(launcherConfigPath)) {
+      console.warn(
+        `[PartitionDiscovery] Launcher config not found: ${launcherConfigPath}`
+      );
+      return null;
+    }
+
+    let launcherConfig;
+
+    try {
+      const raw = fs.readFileSync(launcherConfigPath, "utf8");
+      launcherConfig = JSON.parse(raw);
+    } catch (err) {
+      throw new Error(
+        `Launcher config could not be read: ${err.message}`
+      );
+    }
+
+    const activePartitionId = launcherConfig.activePartitionId;
+
+    const activePartition = Array.isArray(launcherConfig.partitions)
+      ? launcherConfig.partitions.find(
+          partition => partition?.id === activePartitionId
+        )
+      : null;
+
+    const selectedPath =
+      activePartition?.path ||
+      launcherConfig.partitionPath ||
+      null;
+
+    if (!selectedPath || typeof selectedPath !== "string") {
+      throw new Error(
+        "Launcher config does not identify a valid active Partition path."
+      );
+    }
+
+    const resolvedPath = path.resolve(selectedPath);
+
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(
+        `Launcher-selected Partition does not exist: ${resolvedPath}`
+      );
+    }
+
+    console.log(
+      `[PartitionDiscovery] Launcher config loaded: ${launcherConfigPath}`
+    );
+
+    console.log(
+      `[PartitionDiscovery] Active Partition ID: ${activePartitionId || "(not specified)"}`
+    );
+
+    console.log(
+      `[PartitionDiscovery] Active Partition path: ${resolvedPath}`
+    );
+
+    return resolvedPath;
+  }
+
 
   // DEBUG: show exactly what env file is being loaded
   console.log("[WM-DEBUG] CWD:", process.cwd());
@@ -502,8 +579,11 @@
   }
 
   try {
+  const launcherPartitionRoot = resolveLauncherPartitionRoot();
+
   const ss = {
     partitionRoot:
+      launcherPartitionRoot ||
       CONFIG.PARTITION_ROOT ||
       process.env.WINGMAN_PARTITION ||
       "D:\\WingManPartition"
