@@ -10,7 +10,7 @@ console.log(">>> [WM-FILE-LOAD] continuity.gateway.cjs loaded");
 
 const fs = require("fs");
 const path = require("path");
-const { Paths } = require("../../core/paths/paths.cjs");
+const { Paths } = require("../../../partition/paths/paths.cjs");
 const writer = require("./continuity.writer.cjs");
 const { loadJSON } = require("../../../partition/api/storage.cjs");
 
@@ -98,3 +98,4 @@ module.exports = {
   writeProjectMap,
   writePreferences
 };
+
