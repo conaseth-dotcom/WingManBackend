@@ -1,38 +1,21 @@
 /**
- * ============================================================
- *  WingMan Provider Registry (Skeleton)
- *  ------------------------------------------------------------
- *  Role:
- *    Central list of all supported AI providers.
+ * WingMan Provider Registry
  *
- *  Owner:
- *    OnboardingPipeline.cjs imports this directly.
- *
- *  Scope:
- *    system-hidden (never exposed to AI)
- *
- *  Responsibilities:
- *    - Define provider metadata
- *    - Provide lookup functions
- *    - Ensure consistent provider naming
- *    - Prevent orphaned provider files
- *
- *  Notes:
- *    This file replaces scattered provider definitions.
- *    All providers must be registered here.
- * ============================================================
+ * Canonical backend registry for providers currently implemented in
+ * WingManBackend/providers.
  */
 
 const log = (...args) => console.log("[REGISTRY]", ...args);
 
-// Provider definitions (expand as needed)
 const PROVIDERS = {
   openai: {
     id: "openai",
     displayName: "OpenAI",
     requiresKey: true,
     keyPrefix: "sk-",
-    testModel: "gpt-4o-mini" // or whatever you choose
+    supportsOrgId: true,
+    supportsProjectId: true,
+    testModel: "gpt-4o-mini"
   },
 
   anthropic: {
@@ -40,31 +23,64 @@ const PROVIDERS = {
     displayName: "Anthropic (Claude)",
     requiresKey: true,
     keyPrefix: "sk-ant-",
+    supportsOrgId: false,
+    supportsProjectId: false,
     testModel: "claude-3-haiku"
+  },
+
+  gemini: {
+    id: "gemini",
+    displayName: "Google Gemini",
+    requiresKey: true,
+    keyPrefix: null,
+    supportsOrgId: false,
+    supportsProjectId: false,
+    testModel: "gemini-1.5-flash"
+  },
+
+  deepseek: {
+    id: "deepseek",
+    displayName: "DeepSeek",
+    requiresKey: true,
+    keyPrefix: null,
+    supportsOrgId: false,
+    supportsProjectId: false,
+    testModel: null
+  },
+
+  lmstudio: {
+    id: "lmstudio",
+    displayName: "LM Studio",
+    requiresKey: false,
+    keyPrefix: null,
+    supportsOrgId: false,
+    supportsProjectId: false,
+    testModel: null
+  },
+
+  ollama: {
+    id: "ollama",
+    displayName: "Ollama",
+    requiresKey: false,
+    keyPrefix: null,
+    supportsOrgId: false,
+    supportsProjectId: false,
+    testModel: null
   }
 };
 
-/**
- * Get provider definition by ID.
- */
 function get(providerId) {
   log("Lookup provider:", providerId);
   return PROVIDERS[providerId] || null;
 }
 
-/**
- * List all providers.
- */
 function list() {
   log("Listing all providers");
   return Object.values(PROVIDERS);
 }
 
-/**
- * Check if provider exists.
- */
 function exists(providerId) {
-  const found = !!PROVIDERS[providerId];
+  const found = Boolean(PROVIDERS[providerId]);
   log("Provider exists:", providerId, found);
   return found;
 }
