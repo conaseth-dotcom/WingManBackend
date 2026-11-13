@@ -2,7 +2,7 @@
    WingMan Backend File
 
    Alias: @backend-ai/ai.startup.cjs
-   Role: AI onboarding orchestrator. Loads carepackage, boots relationship
+   Role: AI activation orchestrator. Loads carepackage, boots relationship
          engine + BlackBox, and wires AI runtime only when explicitly invoked.
 ========================================================================= */
 
@@ -11,15 +11,13 @@ console.log(">>> [WM-FILE-LOAD] ai.startup.cjs loaded");
 // ---------------------------------------------------------------------------
 // CommonJS imports (defensive, MVP-friendly)
 // ---------------------------------------------------------------------------
-const path = require("path");
-
 let logger;
 try {
   logger = require("./lib/logger.cjs");
 } catch {
   logger = {
-    info:  console.log,
-    warn:  console.warn,
+    info: console.log,
+    warn: console.warn,
     error: console.error
   };
 }
@@ -77,10 +75,10 @@ let RelationshipRuntime;
 let RelationshipBootstrap;
 try {
   const RelationshipIndex = require("../BlackBox/relationship/runtime/index.cjs");
-  RelationshipRuntime   = RelationshipIndex.runtime;
+  RelationshipRuntime = RelationshipIndex.runtime;
   RelationshipBootstrap = RelationshipIndex.initializeWingManRuntime || null;
 } catch {
-  RelationshipRuntime   = null;
+  RelationshipRuntime = null;
   RelationshipBootstrap = null;
 }
 
@@ -90,121 +88,148 @@ try {
 async function safeCall(label, fn, ...args) {
   if (typeof fn !== "function") {
     logger.warn(`[AI-Startup] ${label} unavailable (no function export)`);
-    return null;
+    return { ok: false, available: false, value: null };
   }
+
   try {
-    const result = await fn(...args);
+    const value = await fn(...args);
     logger.info(`[AI-Startup] ${label} completed`);
-    return result;
+    return { ok: true, available: true, value };
   } catch (err) {
     logger.warn(`[AI-Startup] ${label} failed`, { err: err.message });
-    return null;
+    return { ok: false, available: true, value: null, error: err.message };
   }
 }
 
 // ---------------------------------------------------------------------------
-// Main onboarding entry point
+// Main AI activation entry point
 // ---------------------------------------------------------------------------
 async function startAIOnboarding({ systemSettings = {}, partitionPaths = null } = {}) {
-  logger.info("[AI-Startup] Beginning AI onboarding sequence…");
+  logger.info("[AI-Startup] Beginning AI activation sequence...");
 
-  // ------------------------------------------------------------
-  // Phase 1 — Load carepackage (brain + temperament)
-  // ------------------------------------------------------------
+  const phases = {};
+
+  // Phase 1 - Load carepackage
   let carepackage = null;
   if (CarepackageLoader) {
-    carepackage = await safeCall(
+    phases.carepackage = await safeCall(
       "CarepackageLoader.loadCarepackage",
-      CarepackageLoader.loadCarepackage || CarepackageLoader.load || CarepackageLoader.initialize,
+      CarepackageLoader.loadCarepackage ||
+        CarepackageLoader.load ||
+        CarepackageLoader.initialize,
       { systemSettings }
     );
+    carepackage = phases.carepackage.value;
   } else {
-    logger.warn("[AI-Startup] Carepackage loader missing — using fallback personality only");
+    logger.warn("[AI-Startup] Carepackage loader missing - using fallback personality only");
+    phases.carepackage = { ok: false, available: false };
   }
 
-  // ------------------------------------------------------------
-  // Phase 2 — Boot relationship engine (BlackBox mind)
-  // ------------------------------------------------------------
+  // Phase 2 - Boot relationship engine
   if (RelationshipBootstrap) {
-    await safeCall(
+    phases.relationship = await safeCall(
       "RelationshipBootstrap.initializeWingManRuntime",
       RelationshipBootstrap,
       { carepackage, systemSettings }
     );
   } else if (RelationshipRuntime) {
     logger.info("[AI-Startup] Relationship runtime available (no explicit bootstrap)");
+    phases.relationship = { ok: true, available: true };
   } else {
-    logger.warn("[AI-Startup] Relationship engine unavailable — AI will be context-light");
+    logger.warn("[AI-Startup] Relationship engine unavailable - AI will be context-light");
+    phases.relationship = { ok: false, available: false };
   }
 
-  // ------------------------------------------------------------
-  // Phase 3 — Load personality + memory
-  // ------------------------------------------------------------
+  // Phase 3 - Load personality + memory
   if (PersonalityEngine) {
-    await safeCall(
+    phases.personality = await safeCall(
       "PersonalityEngine.initializePersonality",
-      PersonalityEngine.initializePersonality || PersonalityEngine.initialize || PersonalityEngine.load,
+      PersonalityEngine.initializePersonality ||
+        PersonalityEngine.initialize ||
+        PersonalityEngine.load,
       { carepackage, systemSettings }
     );
+  } else {
+    phases.personality = { ok: false, available: false };
   }
 
   if (MemoryLoader) {
-    await safeCall(
+    phases.memory = await safeCall(
       "MemoryLoader.initializeMemory",
-      MemoryLoader.initializeMemory || MemoryLoader.initialize || MemoryLoader.load,
+      MemoryLoader.initializeMemory ||
+        MemoryLoader.initialize ||
+        MemoryLoader.load,
       { systemSettings, partitionPaths }
     );
+  } else {
+    phases.memory = { ok: false, available: false };
   }
 
-  // ------------------------------------------------------------
-  // Phase 4 — Initialize AI providers + runtime
-  // ------------------------------------------------------------
+  // Phase 4 - Initialize providers + runtime
   if (ProviderFactory) {
-    await safeCall(
+    phases.providers = await safeCall(
       "ProviderFactory.initializeProviders",
-      ProviderFactory.initializeProviders || ProviderFactory.initialize || ProviderFactory.loadProviders,
+      ProviderFactory.initializeProviders ||
+        ProviderFactory.initialize ||
+        ProviderFactory.loadProviders,
       { systemSettings }
     );
+  } else {
+    phases.providers = { ok: false, available: false };
   }
 
   if (AIRuntime) {
-    await safeCall(
+    phases.runtime = await safeCall(
       "AIRuntime.initializeRuntime",
       AIRuntime.initializeRuntime || AIRuntime.initialize || AIRuntime.init,
       { systemSettings }
     );
+  } else {
+    phases.runtime = { ok: false, available: false };
   }
 
-  // ------------------------------------------------------------
-  // Phase 5 — Build context (WingMan environment + user habits)
-  // ------------------------------------------------------------
+  // Phase 5 - Build context
   if (ContextBuilder) {
-    await safeCall(
+    phases.context = await safeCall(
       "ContextBuilder.initializeContext",
-      ContextBuilder.initializeContext || ContextBuilder.initialize || ContextBuilder.buildContext,
+      ContextBuilder.initializeContext ||
+        ContextBuilder.initialize ||
+        ContextBuilder.buildContext,
       { systemSettings, partitionPaths, carepackage }
     );
+  } else {
+    phases.context = { ok: false, available: false };
   }
 
-  // ------------------------------------------------------------
-  // Phase 6 — Initialize BlackBox (gateway + autonomy + thinking)
-  // ------------------------------------------------------------
+  // Phase 6 - Initialize BlackBox
   if (BlackBoxRuntime) {
-    await safeCall(
+    phases.blackbox = await safeCall(
       "BlackBoxRuntime.initialize",
       BlackBoxRuntime.initialize.bind(BlackBoxRuntime),
       { systemSettings }
     );
   } else {
-    logger.warn("[AI-Startup] BlackBox runtime unavailable — AI will run without governed gateway");
+    logger.warn("[AI-Startup] BlackBox runtime unavailable - AI will run without governed gateway");
+    phases.blackbox = { ok: false, available: false };
   }
 
-  logger.info("[AI-Startup] AI onboarding sequence complete.");
+  logger.info("[AI-Startup] AI activation sequence complete.");
+
+  // IMPORTANT:
+  // Never return runtime/module objects here. They may contain circular
+  // references and are internal backend implementation details.
   return {
-    carepackage,
-    relationshipRuntime: RelationshipRuntime,
-    blackbox: BlackBoxRuntime,
-    aiRuntime: AIRuntime
+    active: true,
+    phases: Object.fromEntries(
+      Object.entries(phases).map(([name, status]) => [
+        name,
+        {
+          ok: status.ok === true,
+          available: status.available === true,
+          ...(status.error ? { error: status.error } : {})
+        }
+      ])
+    )
   };
 }
 
