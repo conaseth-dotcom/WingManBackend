@@ -2,8 +2,9 @@
    WingMan Backend File
 
    Alias: @backend-ai/ai.pipeline.cjs
-   Role: AI pipeline. Manages provider sessions, builds full WingMan context
-         for each request, and streams replies from the LLM.
+   Role: AI pipeline. Manages provider sessions, performs required WingMan
+         orientation, builds full WingMan context for each request, and
+         streams replies from the LLM.
 ========================================================================= */
 
 const fs = require("fs");
@@ -12,7 +13,7 @@ const { randomUUID } = require("crypto");
 
 const { buildAIContext } = require("./ai.context.builder.cjs");
 const { createAISandbox } = require("./sandbox/ai.sandbox.cjs");
-const OnboardingRuntime = require("../BlackBox/relationship/runtime/onboarding.cjs");
+const { runAIOrientation } = require("./orientation/ai.orientation.cjs");
 
 const { applyPersonalityToMessages } = require("./ai.personality.cjs");
 const { buildVisionPrompt } = require("./ai.vision.personality.cjs");
@@ -20,11 +21,10 @@ const { describeImage } = require("./ai.vision.cjs");
 
 const { loadAIIdentity } = require("./ai.identity.cjs");
 
-/* ─── Session store ───────────────────────────────────────────── */
+/* Session store */
 const sessions = new Map();
 
-/* ─── Provider client factory ────────────────────────────────── */
-/* PATCH: add orgId + projectId */
+/* Provider client factory */
 async function createClient(provider, apiKey, baseUrl, orgId, projectId) {
   const p = provider?.toLowerCase();
 
@@ -41,7 +41,6 @@ async function createClient(provider, apiKey, baseUrl, orgId, projectId) {
       openai: "https://api.openai.com/v1"
     };
 
-    /* PATCH: inject orgId + projectId */
     return new OpenAI({
       apiKey,
       organization: orgId || undefined,
@@ -71,7 +70,7 @@ function defaultModel(provider) {
   }
 }
 
-/* ─── connect ────────────────────────────────────────────────── */
+/* connect */
 async function connect(config = {}) {
   const {
     provider = "openai",
@@ -79,7 +78,6 @@ async function connect(config = {}) {
     model,
     baseUrl,
     params = {},
-    /* PATCH: accept orgId + projectId */
     orgId,
     projectId
   } = config;
@@ -87,7 +85,6 @@ async function connect(config = {}) {
   if (!apiKey) return { ok: false, error: "apiKey is required" };
 
   try {
-    /* PATCH: pass orgId + projectId */
     const client = await createClient(provider, apiKey, baseUrl, orgId, projectId);
 
     const sessionId = randomUUID();
@@ -101,24 +98,42 @@ async function connect(config = {}) {
       client,
       params,
       log: [],
-      state: "ready",
+      state: "orienting",
+      orientation: null,
       startedAt,
       configVersion: "1.0.0",
-
-      /* PATCH: store orgId + projectId in session */
       orgId,
       projectId
     });
 
+    const session = sessions.get(sessionId);
+
     console.log(`[ai.pipeline] Session created: ${sessionId} (${provider}/${resolvedModel})`);
-    return { ok: true, sessionId, provider, model: resolvedModel, state: "ready" };
+    console.log(`[ai.pipeline] AI orientation starting: ${sessionId}`);
+
+    const orientation = await runAIOrientation(session, {
+      onProgress(progress) {
+        console.log("[ai.pipeline] Orientation progress:", progress);
+      }
+    });
+
+    console.log(`[ai.pipeline] AI orientation complete: ${sessionId}`);
+
+    return {
+      ok: true,
+      sessionId,
+      provider,
+      model: resolvedModel,
+      state: session.state,
+      orientation
+    };
   } catch (err) {
     console.error("[ai.pipeline] connect error:", err.message);
     return { ok: false, error: err.message };
   }
 }
 
-/* ─── build system/context messages ──────────────────────────── */
+/* build system/context messages */
 async function buildMessagesForSession(session, userMessage, history = []) {
   const context = await buildAIContext(session, {
     includePartitions: true,
@@ -162,70 +177,31 @@ async function buildMessagesForSession(session, userMessage, history = []) {
   return { messages, context };
 }
 
-/* ─── chat (streaming, with full context) ────────────────────── */
+/* chat */
 async function chat({ sessionId, message, history = [], onChunk } = {}) {
   const session = sessions.get(sessionId);
   if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
+
+  if (
+    session.state !== "ready" &&
+    session.state !== "ready_for_introduction"
+  ) {
+    return {
+      ok: false,
+      error: "The AI has not completed WingMan orientation.",
+      state: session.state
+    };
+  }
 
   session.state = "thinking";
   const t0 = Date.now();
 
   try {
-    const { messages, context } = await buildMessagesForSession(session, message, history);
+    const { messages } = await buildMessagesForSession(session, message, history);
 
     const identity = await loadAIIdentity();
     applyPersonalityToMessages(identity, messages);
 
-    const onboarding = context.onboarding;
-    const relationshipRuntime = context.relationshipRuntime;
-
-    /* ─── Onboarding Mode ───────────────────────────────────────── */
-    if (onboarding && onboarding.completed === false) {
-      console.log(">>> [AI-PIPELINE] Onboarding mode active");
-
-      const {
-        nextState,
-        updatedProfile,
-        onboardingComplete
-      } = await OnboardingRuntime.advanceOnboardingHandshake(session, message);
-
-      if (onboardingComplete === true) {
-        console.log(">>> [AI-PIPELINE] Onboarding completed");
-        relationshipRuntime.markOnboardingComplete();
-      }
-
-      const systemPrompt = context.systemPrompt ?? "WingMan Onboarding";
-
-      const onboardingMessages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: message }
-      ];
-
-      const reply = await session.client.chat.completions.create({
-        model: session.model,
-        messages: onboardingMessages,
-        stream: false,
-        ...session.params
-      });
-
-      const fullReply = reply.choices?.[0]?.message?.content ?? "";
-
-      session.log.push(
-        { role: "user", content: message, ts: t0 },
-        { role: "assistant", content: fullReply, ts: Date.now() }
-      );
-
-      session.state = "ready";
-
-      return {
-        ok: true,
-        fullReply,
-        onboardingState: nextState,
-        onboardingComplete
-      };
-    }
-
-    /* ─── Normal Chat Mode (Streaming) ─────────────────────────── */
     let fullReply = "";
 
     if (session.provider === "openai" || session.provider === "groq") {
@@ -235,6 +211,7 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
         stream: true,
         ...session.params
       });
+
       for await (const chunk of stream) {
         const segment = chunk.choices?.[0]?.delta?.content ?? "";
         if (segment) {
@@ -242,7 +219,6 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
           onChunk?.(segment);
         }
       }
-
     } else if (session.provider === "anthropic") {
       const systemMsg = messages.find(m => m.role === "system");
       const userMessages = messages.filter(m => m.role !== "system");
@@ -263,7 +239,6 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
           onChunk?.(segment);
         }
       }
-
     } else {
       throw new Error(`No chat implementation for provider: ${session.provider}`);
     }
@@ -279,7 +254,6 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
     console.log(`[ai.pipeline] chat done: ${sessionId} (${latencyMs}ms)`);
 
     return { ok: true, fullReply, latencyMs };
-
   } catch (err) {
     session.state = "error";
     console.error("[ai.pipeline] chat error:", err.message);
@@ -287,7 +261,7 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
   }
 }
 
-/* ─── vision mode (personality-aware) ─────────────────────────── */
+/* vision mode */
 async function vision({ imagePath }) {
   const identity = await loadAIIdentity();
 
@@ -296,6 +270,17 @@ async function vision({ imagePath }) {
 
   const session = [...sessions.values()][0];
   if (!session) return { ok: false, error: "No active session" };
+
+  if (
+    session.state !== "ready" &&
+    session.state !== "ready_for_introduction"
+  ) {
+    return {
+      ok: false,
+      error: "The AI has not completed WingMan orientation.",
+      state: session.state
+    };
+  }
 
   const reply = await session.client.chat.completions.create({
     model: session.model,
@@ -310,7 +295,7 @@ async function vision({ imagePath }) {
   return { ok: true, fullReply };
 }
 
-/* ─── disconnect ─────────────────────────────────────────────── */
+/* disconnect */
 function disconnect({ sessionId } = {}) {
   const session = sessions.get(sessionId);
   if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
@@ -322,14 +307,14 @@ function disconnect({ sessionId } = {}) {
   return { ok: true, log };
 }
 
-/* ─── exportLog ──────────────────────────────────────────────── */
+/* exportLog */
 function exportLog(sessionId) {
   const session = sessions.get(sessionId);
   if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
   return { ok: true, log: [...session.log] };
 }
 
-/* ─── getSession ─────────────────────────────────────────────── */
+/* getSession */
 function getSession(sessionId) {
   const session = sessions.get(sessionId);
   if (!session) return null;
@@ -338,12 +323,23 @@ function getSession(sessionId) {
   return safe;
 }
 
-/* ─── placeFile (partition → sandbox pipeline) ─────────── */
+/* placeFile */
 async function placeFile({ localPath, partition }) {
   try {
     const session = [...sessions.values()][0];
     if (!session) {
       return { ok: false, error: "No active WingMan session." };
+    }
+
+    if (
+      session.state !== "ready" &&
+      session.state !== "ready_for_introduction"
+    ) {
+      return {
+        ok: false,
+        error: "The AI has not completed WingMan orientation.",
+        state: session.state
+      };
     }
 
     const sandbox = await createAISandbox(session);
