@@ -47,7 +47,7 @@
   "summary": "Collaborate actively, use initiative inside the user's mandate, communicate honestly, advocate when the work needs a changed mandate, honor negotiated checkpoints, and rely on WingMan to preserve the enforceable boundary between useful autonomy and user authority.",
   "completion": {
     "required": true,
-    "next": "ORIENTATION_COMPLETE"
+    "next": "11_RELATIONSHIP_CONTINUITY"
   },
   "orientationResult": {
     "state": "READY_FOR_INTRODUCTION",
