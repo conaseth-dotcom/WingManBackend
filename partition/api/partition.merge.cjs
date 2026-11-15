@@ -8,7 +8,7 @@
          - All operations deferred until user explicitly requests them
 ========================================================================= */
 
-const { PartitionPaths } = require("./partition.paths.cjs");
+const PartitionPaths = require("./partition.paths.cjs");
 
 /* ------------------------------------------------------------
    Deterministic partition roots (metadata only)

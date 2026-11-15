@@ -9,7 +9,6 @@
 
 import fs from "fs/promises";
 import path from "path";
-import { PartitionLogger } from "./partition.logger.cjs";
 
 /* ------------------------------------------------------------
    Recursively scan a folder with progress
@@ -93,19 +92,11 @@ export async function scanFolder(src, progressCallback) {
         folderCount: stats.folderCount,
         totalSize: stats.totalSize
       });
-    }
-
-    await PartitionLogger.log("copy-preview", "Folder scan complete", stats);
+    }   
 
     return stats;
   } catch (err) {
     console.error("[PartitionCopyPreview] scan error:", src, err);
-
-    await PartitionLogger.log("error", "Copy preview failed", {
-      src,
-      message: err.message,
-      stack: err.stack
-    });
 
     if (progressCallback) {
       progressCallback({
