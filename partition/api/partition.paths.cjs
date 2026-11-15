@@ -43,34 +43,7 @@ const PartitionPaths = {
   getUserVoiceRoot: () => rootJoin("user", "voice"),
   getUserVoiceProfilePath: () =>
     rootJoin("user", "voice", "wm.voiceProfile.json"),
-    // Trays
-  getTraysRoot: () => rootJoin("user", "trays"),
-
-  getTrayFolder: (trayId) => {
-    const id = String(trayId).startsWith("tray-") ? trayId : `tray-${trayId}`;
-    return rootJoin("user", "trays", id);
-  },
-
-  getItemFolder: (trayId, itemName) =>
-    rootJoin("user", "trays",
-      String(trayId).startsWith("tray-") ? trayId : `tray-${trayId}`,
-      String(itemName)
-    ),
-
-  getMetadataPath: (trayId, itemName) =>
-    rootJoin("user", "trays",
-      String(trayId).startsWith("tray-") ? trayId : `tray-${trayId}`,
-      String(itemName),
-      "metadata.json"
-    ),
-
-  getPreviewFolder: (trayId, itemName) =>
-    rootJoin("user", "trays",
-      String(trayId).startsWith("tray-") ? trayId : `tray-${trayId}`,
-      String(itemName),
-      "preview"
-    ),
-
+    
   // Legacy override
   overrideRoot(newRoot) {
     if (typeof newRoot === "string" && newRoot.trim()) {

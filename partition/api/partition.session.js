@@ -3,15 +3,11 @@
    Path: C:/WingManBackend/partition/api/partition.session.cjs
 ========================================================================= */
 
-const { PartitionPaths } = require("./partition.paths.cjs");
+const PartitionPaths = require("./partition.paths.cjs");
 
 /* ---------------------------------------------------------------------------
    Lazy-load hooks (safe, minimal, future expansion)
 --------------------------------------------------------------------------- */
-
-async function loadTraysOnDemand() {
-  return { trays: [], mounted: [] };
-}
 
 async function loadSandboxOnDemand() {
   return { projects: [] };
@@ -39,7 +35,6 @@ function init({ logger, systemSettings }) {
     startedAt: new Date().toISOString(),
 
     // Partition subsystems are NOT loaded at startup
-    trays: null,
     sandbox: null,
     sync: null,
     review: null,
@@ -57,7 +52,6 @@ function init({ logger, systemSettings }) {
     },
 
     // Lazy-load hooks
-    loadTrays: loadTraysOnDemand,
     loadSandbox: loadSandboxOnDemand,
     runSync: runSyncOnDemand,
     runReview: runReviewOnDemand,

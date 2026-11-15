@@ -42,16 +42,15 @@ function validateFreeSpace(dir) {
 }
 
 /**
- * Validate folder structure (trays, voice, rooms, sandbox)
+ * Validate folder structure (voice, rooms, sandbox)
  */
 function validateStructure(dir) {
   const required = [
-    "trays",
     "voice",
     "rooms",
     "sandbox"
   ];
-
+  
   try {
     for (const folder of required) {
       const full = path.join(dir, folder);
