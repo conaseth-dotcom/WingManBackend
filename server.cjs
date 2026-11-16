@@ -5,19 +5,20 @@
 (async () => {
   console.log(">>> [WM-SERVER] BACKEND INSTANCE: server.cjs booting…");
 
-  const path        = require('path');
-  const http        = require('http');
-  const express     = require('express');
-  const cors        = require('cors');
-  const helmet      = require('helmet');
-  const morgan      = require('morgan');
+  const path = require('path');
+  const http = require('http');
+  const express = require('express');
+  const cors = require('cors');
+  const helmet = require('helmet');
+  const morgan = require('morgan');
   const compression = require('compression');
   const EventEmitter = require('events');
-  const fs          = require('fs');
+  const fs = require('fs');
 
   // ─── Root + helpers ─────────────────────────────────────────────────────────
-  const ROOT = path.resolve(__dirname);     
-  const r    = (...parts) => path.join(ROOT, ...parts);
+  const ROOT = path.resolve(__dirname);
+  const r = (...parts) => path.join(ROOT, ...parts);
+
   // Resolve the launcher-selected Partition for this backend session.
   function resolveLauncherPartitionRoot() {
     const appDataRoot = process.env.APPDATA;
@@ -95,7 +96,6 @@
     return resolvedPath;
   }
 
-
   // DEBUG: show exactly what env file is being loaded
   console.log("[WM-DEBUG] CWD:", process.cwd());
   console.log("[WM-DEBUG] __dirname:", __dirname);
@@ -108,7 +108,7 @@
   console.log("[WM-SERVER] ROOT resolved:", ROOT);
 
   // ─── App + server ───────────────────────────────────────────────────────────
-  const app    = express();
+  const app = express();
   const server = http.createServer(app);
 
   console.log("[WM-SERVER] Express app + HTTP server created");
@@ -129,14 +129,14 @@
     console.log("[WM-LOGGER] ai/lib/logger loaded successfully");
   } catch (e) {
     console.log("[WM-LOGGER] ai/lib/logger unavailable, falling back to console logger:", e.message);
-    const ts  = () => new Date().toISOString();
+    const ts = () => new Date().toISOString();
     const fmt = (lvl, msg, meta) =>
       `[${ts()}] [${lvl.toUpperCase()}] ${msg}${meta ? ' ' + JSON.stringify(meta) : ''}`;
     logger = {
-      info  : (m, x) => console.log (fmt('info',  m, x)),
-      warn  : (m, x) => console.warn (fmt('warn',  m, x)),
-      error : (m, x) => console.error(fmt('error', m, x)),
-      debug : (m, x) => console.debug(fmt('debug', m, x)),
+      info: (m, x) => console.log(fmt('info', m, x)),
+      warn: (m, x) => console.warn(fmt('warn', m, x)),
+      error: (m, x) => console.error(fmt('error', m, x)),
+      debug: (m, x) => console.debug(fmt('debug', m, x)),
     };
   }
   app.locals.logger = logger;
@@ -153,10 +153,10 @@
     } catch (e) {
       console.log("[WM-CONFIG] core/state unavailable, using ENV fallback:", e.message);
       return {
-        PORT           : parseInt(process.env.PORT         || '4000', 10),
-        HOST           : process.env.HOST                  || '0.0.0.0',
-        ENV            : process.env.NODE_ENV              || 'production',
-        _ROOT : process.env.PARTITION_ROOT
+        PORT: parseInt(process.env.PORT || '4000', 10),
+        HOST: process.env.HOST || '0.0.0.0',
+        ENV: process.env.NODE_ENV || 'production',
+        PARTITION_ROOT: process.env.PARTITION_ROOT
       };
     }
   })();
@@ -177,7 +177,7 @@
   }));
   console.log("[WM-MW] Middleware stack registered");
 
-  // ─── Static file hosting for launcher (manifest, messages, version, maintenance) ───
+  // ─── Static file hosting for launcher ───────────────────────────────────────
   app.use(express.static(path.join(__dirname, "public")));
   app.get('/messages.json', (req, res) => {
     res.sendFile(path.join(__dirname, "public", "messages.json"));
@@ -195,7 +195,7 @@
   );
   console.log("[WM-ROUTE] Health + readiness routes mounted");
 
-  // ─── Version route (dynamic version for launcher) ───────────────────────────
+  // ─── Version route ──────────────────────────────────────────────────────────
   app.get('/version', (req, res) => {
     try {
       const versionData = require(path.join(__dirname, "public", "version.json"));
@@ -208,7 +208,7 @@
   });
   console.log("[WM-ROUTE] Version route mounted");
 
-  // ─── Messages route (static messages.json for launcher UI) ───────────────────
+  // ─── Messages route ─────────────────────────────────────────────────────────
   app.get('/api/messages', (req, res) => {
     const filePath = path.join(__dirname, "public", "messages.json");
 
@@ -249,22 +249,21 @@
 
   const PROVIDERS = {};
   const providerDefs = [
-    { key: 'openai',    mod: 'providers/provider-openai'    },
+    { key: 'openai', mod: 'providers/provider-openai' },
     { key: 'anthropic', mod: 'providers/provider-anthropic' },
-    { key: 'gemini',    mod: 'providers/provider-gemini'    },
-    { key: 'deepseek',  mod: 'providers/provider-deepseek'  },
-    { key: 'lmstudio',  mod: 'providers/provider-lmstudio'  },
-    { key: 'ollama',    mod: 'providers/provider-ollama'    },
-    { key: 'custom',    mod: 'providers/provider-custom'    },
+    { key: 'gemini', mod: 'providers/provider-gemini' },
+    { key: 'deepseek', mod: 'providers/provider-deepseek' },
+    { key: 'lmstudio', mod: 'providers/provider-lmstudio' },
+    { key: 'ollama', mod: 'providers/provider-ollama' },
+    { key: 'custom', mod: 'providers/provider-custom' },
   ];
 
-  for (const { key, mod } of providerDefs) { 
+  for (const { key, mod } of providerDefs) {
     console.log(`[WM-PROVIDER] Attempting to load provider: ${key} from ${mod}.cjs`);
     try {
       let provider = require(r(mod + '.cjs'));
       provider = provider.default || provider;
 
-      // Unified factory wrapper for runtime.create()
       PROVIDERS[key] = {
         ...provider,
         create: (apiKey, orgId, projectId) => {
@@ -332,7 +331,7 @@
     console.log("[WM-AI] Onboarding Pipeline unavailable:", e.message);
   }
 
-  // Chat Runtime (optional separate runtime)
+  // Chat Runtime
   console.log("[WM-AI] Loading ai.ChatRuntime.cjs…");
   try {
     let mod = require(r('ai/ai.ChatRuntime.cjs'));
@@ -439,7 +438,6 @@
   // ─── BlackBox stack ─────────────────────────────────────────────────────────
   let bbRuntime, bbAutonomy, bbThinking, bbRelationship, bbUI, bbGateway;
 
-  // BlackBox Runtime
   console.log("[WM-BB] Loading BlackBox Runtime…");
   try {
     bbRuntime = require(r('BlackBox/blackbox.runtime.cjs'));
@@ -459,16 +457,11 @@
     console.log("[WM-BB] BlackBox Runtime unavailable:", e.message);
   }
 
-  // Autonomy
   console.log("[WM-BB] Loading BlackBox Autonomy…");
   try {
     bbAutonomy = require(r('BlackBox/blackbox.autonomy.cjs'));
     if (typeof bbAutonomy.init === 'function') {
-      const result = bbAutonomy.init({
-        bbRuntime,
-        eventBus,
-        logger
-      });
+      const result = bbAutonomy.init({ bbRuntime, eventBus, logger });
       if (result instanceof Promise) await result;
     }
     logger.info('BlackBox Autonomy initialised');
@@ -478,16 +471,11 @@
     console.log("[WM-BB] BlackBox Autonomy unavailable:", e.message);
   }
 
-  // Thinking
   console.log("[WM-BB] Loading BlackBox Thinking…");
   try {
     bbThinking = require(r('BlackBox/blackbox.thinking.cjs'));
     if (typeof bbThinking.init === 'function') {
-      const result = bbThinking.init({
-        bbRuntime,
-        contextBuilder,
-        logger
-      });
+      const result = bbThinking.init({ bbRuntime, contextBuilder, logger });
       if (result instanceof Promise) await result;
     }
     logger.info('BlackBox Thinking initialised');
@@ -497,16 +485,11 @@
     console.log("[WM-BB] BlackBox Thinking unavailable:", e.message);
   }
 
-  // Relationship
   console.log("[WM-BB] Loading BlackBox Relationship…");
   try {
     bbRelationship = require(r('BlackBox/relationship/runtime/index.cjs'));
     if (typeof bbRelationship.init === 'function') {
-      const result = bbRelationship.init({
-        memory,
-        identity,
-        logger
-      });
+      const result = bbRelationship.init({ memory, identity, logger });
       if (result instanceof Promise) await result;
     }
     logger.info('BlackBox Relationship Engine initialised');
@@ -516,15 +499,11 @@
     console.log("[WM-BB] BlackBox Relationship Engine unavailable:", e.message);
   }
 
-  // UI Bridge
   console.log("[WM-BB] Loading BlackBox UI Bridge…");
   try {
     bbUI = require(r('BlackBox/ui/index.cjs'));
     if (typeof bbUI.init === 'function') {
-      const result = bbUI.init({
-        eventBus,
-        logger
-      });
+      const result = bbUI.init({ eventBus, logger });
       if (result instanceof Promise) await result;
     }
     logger.info('BlackBox UI Bridge initialised');
@@ -534,7 +513,6 @@
     console.log("[WM-BB] BlackBox UI Bridge unavailable:", e.message);
   }
 
-  // Gateway
   console.log("[WM-BB] Loading BlackBox Gateway…");
   try {
     bbGateway = require(r('BlackBox/blackbox.gateway.cjs'));
@@ -570,68 +548,86 @@
 
   let partitionManager;
   let partitionFS, partitionPaths, partitionMerge,
-      partitionReview, partitionValidator, partitionSession, partitionStorage;
+      partitionReview, partitionValidator, partitionSession, partitionStorage,
+      activePartitionGateway;
 
   try {
-    partitionManager   = require(r('partition/partition.manager.cjs'));
+    partitionManager = require(r('partition/partition.manager.cjs'));
   } catch (e) {
     logger.warn('Partition Manager unavailable', { err: e.message });
   }
 
   try {
-  const launcherPartitionRoot = resolveLauncherPartitionRoot();
+    const launcherPartitionRoot = resolveLauncherPartitionRoot();
 
-  const ss = {
-    partitionRoot:
-      launcherPartitionRoot ||
-      CONFIG.PARTITION_ROOT ||
-      process.env.WINGMAN_PARTITION ||
-      "D:\\WingManPartition"
-  };
+    const ss = {
+      partitionRoot:
+        launcherPartitionRoot ||
+        CONFIG.PARTITION_ROOT ||
+        process.env.WINGMAN_PARTITION ||
+        "D:\\WingManPartition"
+    };
 
-  app.locals.systemSettings = app.locals.systemSettings || {};
-  app.locals.systemSettings.partitionRoot = ss.partitionRoot;
+    app.locals.systemSettings = app.locals.systemSettings || {};
+    app.locals.systemSettings.partitionRoot = ss.partitionRoot;
 
-  // Initialize canonical Partition paths before loading modules
-  // that may resolve Partition locations during import.
-  partitionPaths = require(r('partition/api/partition.paths.cjs'));
-  if (typeof partitionPaths.init === 'function') {
-    const result = partitionPaths.init({
-      logger,
-      systemSettings: app.locals.systemSettings
-    });
+    // Initialize canonical Partition paths before loading modules
+    // that may resolve Partition locations during import.
+    partitionPaths = require(r('partition/api/partition.paths.cjs'));
+    if (typeof partitionPaths.init === 'function') {
+      const result = partitionPaths.init({
+        logger,
+        systemSettings: app.locals.systemSettings
+      });
 
-    if (result instanceof Promise) await result;
-  }
-  partitionFS        = require(r('partition/api/partition.fs.cjs'));
-  partitionMerge     = require(r('partition/api/partition.merge.cjs'));
-  partitionReview    = require(r('partition/api/partition.review.cjs'));
-  partitionValidator = require(r('partition/api/partition.validator.cjs'));
-  partitionSession   = require(r('partition/api/partition.session.cjs'));
-  partitionStorage   = require(r('partition/api/storage.cjs'));
+      if (result instanceof Promise) await result;
+    }
+
+    partitionFS = require(r('partition/api/partition.fs.cjs'));
+    partitionMerge = require(r('partition/api/partition.merge.cjs'));
+    partitionReview = require(r('partition/api/partition.review.cjs'));
+    partitionValidator = require(r('partition/api/partition.validator.cjs'));
+    partitionSession = require(r('partition/api/partition.session.cjs'));
+    partitionStorage = require(r('partition/api/storage.cjs'));
+    activePartitionGateway = require(r('partition/api/active-partition.gateway.cjs'));
 
     if (typeof partitionManager?.init === 'function') {
-      const result = partitionManager.init({ logger, systemSettings: app.locals.systemSettings });
+      const result = partitionManager.init({
+        logger,
+        systemSettings: app.locals.systemSettings
+      });
       if (result instanceof Promise) await result;
     }
 
     if (typeof partitionFS.init === 'function') {
-      const result = partitionFS.init({ logger, systemSettings: app.locals.systemSettings });
+      const result = partitionFS.init({
+        logger,
+        systemSettings: app.locals.systemSettings
+      });
       if (result instanceof Promise) await result;
     }
 
     if (typeof partitionStorage.init === 'function') {
-      const result = partitionStorage.init({ logger, systemSettings: app.locals.systemSettings });
+      const result = partitionStorage.init({
+        logger,
+        systemSettings: app.locals.systemSettings
+      });
       if (result instanceof Promise) await result;
     }
 
     if (typeof partitionSession.init === 'function') {
-      const result = partitionSession.init({ logger, systemSettings: app.locals.systemSettings });
+      const result = partitionSession.init({
+        logger,
+        systemSettings: app.locals.systemSettings
+      });
       if (result instanceof Promise) await result;
     }
 
     if (typeof partitionValidator.init === 'function') {
-      const result = partitionValidator.init({ logger, systemSettings: app.locals.systemSettings });
+      const result = partitionValidator.init({
+        logger,
+        systemSettings: app.locals.systemSettings
+      });
       if (result instanceof Promise) await result;
     }
 
@@ -650,13 +646,17 @@
     review: partitionReview,
     validator: partitionValidator,
     session: partitionSession,
-    storage: partitionStorage
+    storage: partitionStorage,
+    gateway: activePartitionGateway
   };
 
   // ─── Load System Metadata ───────────────────────────────────────────────────
   console.log("[WM-SYSTEM] Loading system metadata…");
   try {
-    const sysMeta = loadSystemMetadata(CONFIG.PARTITION_ROOT || process.env.WINGMAN_PARTITION, logger);
+    const sysMeta = loadSystemMetadata(
+      CONFIG.PARTITION_ROOT || process.env.WINGMAN_PARTITION,
+      logger
+    );
 
     app.locals.systemMetadata = sysMeta;
 
@@ -672,7 +672,7 @@
     console.log("[WM-SYSTEM] ERROR — Failed to load system metadata:", e.message);
   }
 
-  // ─── WingMan AI environment (enterWingMan) ───────────────────────────────────
+  // ─── WingMan AI environment ─────────────────────────────────────────────────
   console.log("[WM-AI] Initialising WingMan AI environment via enterWingMan()…");
   try {
     const env = enterWingMan({
@@ -727,7 +727,7 @@
     }
   }
 
-  // ─── Settings API (new, JSON-based) ─────────────────────────────────────────
+  // ─── Settings API ───────────────────────────────────────────────────────────
   try {
     console.log("[WM-API] Loading api/settings.cjs…");
     const settingsAPI = require(r('api/settings.cjs'));
@@ -737,15 +737,16 @@
     console.log("[WM-API] Settings API unavailable:", e.message);
   }
 
-    // ─── Voice Profile API ──────────────────────────────────────────────────────
-    try {
-      console.log("[WM-API] Loading api/voiceProfile.cjs…");
-      const voiceProfileAPI = require(r('api/voiceProfile.cjs'));
-      safeMount('/api/voice-profile', voiceProfileAPI, 'voice-profile-api');
-    } catch (e) {
-      logger.warn('Voice Profile API unavailable', { err: e.message });
-      console.log("[WM-API] Voice Profile API unavailable:", e.message);
-    }
+  // ─── Voice Profile API ──────────────────────────────────────────────────────
+  try {
+    console.log("[WM-API] Loading api/voiceProfile.cjs…");
+    const voiceProfileAPI = require(r('api/voiceProfile.cjs'));
+    safeMount('/api/voice-profile', voiceProfileAPI, 'voice-profile-api');
+  } catch (e) {
+    logger.warn('Voice Profile API unavailable', { err: e.message });
+    console.log("[WM-API] Voice Profile API unavailable:", e.message);
+  }
+
   // Providers API
   try {
     console.log("[WM-API] Loading api/providers.cjs…");
@@ -757,7 +758,6 @@
   }
 
   // ─── AI routes ──────────────────────────────────────────────────────────────
-  // AI chat (OpenAI-style)
   console.log("[WM-CHAT] Registering /api/ai/chat route…");
   app.post('/api/ai/chat', async (req, res) => {
     console.log("[WM-CHAT] /api/ai/chat invoked");
@@ -874,17 +874,17 @@
     }
   });
 
-  // ─── Launcher Config Bundle (manifest, messages, version, maintenance, URL map) ───
+  // ─── Launcher Config Bundle ─────────────────────────────────────────────────
   console.log("[WM-ROUTE] Registering /api/launcher/config route…");
   app.get('/api/launcher/config', (req, res) => {
     try {
       const base = path.join(__dirname, "public");
 
-      const manifest    = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
-      const messages    = JSON.parse(fs.readFileSync(path.join(base, "messages.json"), "utf8"));
-      const version     = JSON.parse(fs.readFileSync(path.join(base, "version.json"), "utf8"));
+      const manifest = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
+      const messages = JSON.parse(fs.readFileSync(path.join(base, "messages.json"), "utf8"));
+      const version = JSON.parse(fs.readFileSync(path.join(base, "version.json"), "utf8"));
       const maintenance = JSON.parse(fs.readFileSync(path.join(base, "maintenance.json"), "utf8"));
-      const urlMap      = JSON.parse(fs.readFileSync(path.join(base, "backend_URL_map.json"), "utf8"));
+      const urlMap = JSON.parse(fs.readFileSync(path.join(base, "backend_URL_map.json"), "utf8"));
 
       res.json({
         ok: true,

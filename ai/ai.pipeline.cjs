@@ -14,6 +14,8 @@ const { randomUUID } = require("crypto");
 const { buildAIContext } = require("./ai.context.builder.cjs");
 const { createAISandbox } = require("./sandbox/ai.sandbox.cjs");
 const { runAIOrientation } = require("./orientation/ai.orientation.cjs");
+const ActivePartitionGateway =
+  require("../partition/api/active-partition.gateway.cjs");
 
 const { applyPersonalityToMessages } = require("./ai.personality.cjs");
 const { buildVisionPrompt } = require("./ai.vision.personality.cjs");
@@ -118,7 +120,25 @@ async function connect(config = {}) {
     });
 
     console.log(`[ai.pipeline] AI orientation complete: ${sessionId}`);
+    const partitionAccess = ActivePartitionGateway.activate({ sessionId });
 
+    if (!partitionAccess.ok) {
+      session.state = "partition_access_failed";
+
+      throw new Error(
+        `ACTIVE_PARTITION activation failed: ${partitionAccess.error}`
+      );
+    }
+
+    session.activePartition = {
+      capability: partitionAccess.capability,
+      state: partitionAccess.state,
+      operations: partitionAccess.operations
+    };
+
+    console.log(
+      `[ai.pipeline] ACTIVE_PARTITION activated: ${sessionId}`
+    );
     return {
       ok: true,
       sessionId,
@@ -301,6 +321,9 @@ function disconnect({ sessionId } = {}) {
   if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
 
   const log = [...session.log];
+
+  ActivePartitionGateway.deactivate({ sessionId });
+
   sessions.delete(sessionId);
 
   console.log(`[ai.pipeline] Session closed: ${sessionId}`);
