@@ -291,8 +291,8 @@
 
   app.locals.providers = PROVIDERS;
   console.log("[WM-AI] Provider map initialised:", Object.keys(PROVIDERS));
-
-  let aiRuntime, aiPipeline, personality, identity, memory, contextBuilder;
+  
+  let aiRuntime, aiPipeline, personality;
 
   // Runtime
   console.log("[WM-AI] Loading ai.runtime.cjs…");
@@ -374,65 +374,11 @@
     console.log("[WM-AI] Personality unavailable:", e.message);
   }
 
-  // Identity
-  console.log("[WM-AI] Loading ai.identity.cjs…");
-  try {
-    let mod = require(r('ai/ai.identity.cjs'));
-    identity = mod.default || mod;
-    if (typeof identity.init === 'function') {
-      console.log("[WM-AI] Initialising identity engine…");
-      const result = identity.init({ logger });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] Identity init completed");
-    }
-    logger.info('Identity engine initialised');
-  } catch (e) {
-    logger.warn('Identity unavailable', { err: e.message });
-    console.log("[WM-AI] Identity unavailable:", e.message);
-  }
-
-  // Memory
-  console.log("[WM-AI] Loading ai.memory.loader.cjs…");
-  try {
-    let mod = require(r('ai/ai.memory.loader.cjs'));
-    memory = mod.default || mod;
-    if (typeof memory.init === 'function') {
-      console.log("[WM-AI] Initialising memory engine…");
-      const result = memory.init({ logger, eventBus });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] Memory init completed");
-    }
-    logger.info('Memory engine initialised');
-  } catch (e) {
-    logger.warn('Memory unavailable', { err: e.message });
-    console.log("[WM-AI] Memory unavailable:", e.message);
-  }
-
-  // Context builder
-  console.log("[WM-AI] Loading ai.context.builder.cjs…");
-  try {
-    let mod = require(r('ai/ai.context.builder.cjs'));
-    contextBuilder = mod.default || mod;
-    if (typeof contextBuilder.init === 'function') {
-      console.log("[WM-AI] Initialising context builder…");
-      const result = contextBuilder.init({ memory, personality, identity, logger });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] Context builder init completed");
-    }
-    logger.info('Context Builder initialised');
-  } catch (e) {
-    logger.warn('Context Builder unavailable', { err: e.message });
-    console.log("[WM-AI] Context Builder unavailable:", e.message);
-  }
-
   app.locals.ai = {
-    runtime: app.locals.ai?.runtime || aiRuntime,
-    pipeline: aiPipeline,
-    personality,
-    identity,
-    memory,
-    contextBuilder
-  };
+  runtime: app.locals.ai?.runtime || aiRuntime,
+  pipeline: aiPipeline,
+  personality
+};
   console.log("[WM-AI] app.locals.ai populated");
 
   // ─── BlackBox stack ─────────────────────────────────────────────────────────
@@ -475,7 +421,7 @@
   try {
     bbThinking = require(r('BlackBox/blackbox.thinking.cjs'));
     if (typeof bbThinking.init === 'function') {
-      const result = bbThinking.init({ bbRuntime, contextBuilder, logger });
+      const result = bbThinking.init({ bbRuntime, logger });
       if (result instanceof Promise) await result;
     }
     logger.info('BlackBox Thinking initialised');
