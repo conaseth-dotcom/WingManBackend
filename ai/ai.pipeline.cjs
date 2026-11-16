@@ -2,80 +2,113 @@
    WingMan Backend File
 
    Alias: @backend-ai/ai.pipeline.cjs
-   Role: AI pipeline. Manages provider sessions, performs required WingMan
-         orientation, builds full WingMan context for each request, and
-         streams replies from the LLM.
+   Role: Authoritative backend AI session pipeline.
+
+   Responsibilities:
+     - Create and retain provider sessions.
+     - Deliver required governed WingMan orientation.
+     - Activate ACTIVE_PARTITION only after orientation succeeds.
+     - Maintain backend-owned conversation history.
+     - Stream provider replies.
+     - Close sessions and revoke ACTIVE_PARTITION access.
+
+   Explicitly not responsible for:
+     - Reading private Partition notes or scratch material.
+     - Reading First-AI User Interview answers.
+     - Rebuilding identity from legacy carepackage systems.
+     - Exposing host filesystem paths.
+     - Direct filesystem placement into legacy user/shared roots.
+     - Frontend vision, STT, or TTS implementation.
 ========================================================================= */
 
-const fs = require("fs");
-const path = require("path");
-const { randomUUID } = require("crypto");
+'use strict';
 
-const { buildAIContext } = require("./ai.context.builder.cjs");
-const { createAISandbox } = require("./sandbox/ai.sandbox.cjs");
-const { runAIOrientation } = require("./orientation/ai.orientation.cjs");
-const ActivePartitionGateway =
-  require("../partition/api/active-partition.gateway.cjs");
+const { randomUUID } = require('crypto');
+const { runAIOrientation } = require('./orientation/ai.orientation.cjs');
+const ActivePartitionGateway = require('../partition/api/active-partition.gateway.cjs');
 
-const { applyPersonalityToMessages } = require("./ai.personality.cjs");
-const { buildVisionPrompt } = require("./ai.vision.personality.cjs");
-const { describeImage } = require("./ai.vision.cjs");
-
-const { loadAIIdentity } = require("./ai.identity.cjs");
-
-/* Session store */
 const sessions = new Map();
 
-/* Provider client factory */
-async function createClient(provider, apiKey, baseUrl, orgId, projectId) {
-  const p = provider?.toLowerCase();
+function normalizeProvider(provider) {
+  return String(provider || 'openai').trim().toLowerCase();
+}
 
-  if (p === "openai" || p === "groq") {
+function defaultModel(provider) {
+  switch (normalizeProvider(provider)) {
+    case 'groq':
+      return 'llama-3.3-70b-versatile';
+    case 'anthropic':
+      return 'claude-3-5-sonnet-20241022';
+    default:
+      return 'gpt-4o';
+  }
+}
+
+async function createClient(provider, apiKey, baseUrl, orgId, projectId) {
+  const normalizedProvider = normalizeProvider(provider);
+
+  if (normalizedProvider === 'openai' || normalizedProvider === 'groq') {
     let OpenAI;
     try {
-      OpenAI = require("openai");
+      OpenAI = require('openai');
     } catch {
-      throw new Error("openai package not found. Run: npm install openai");
+      throw new Error('openai package not found. Run: npm install openai');
     }
 
-    const BASE_URLS = {
-      groq: "https://api.groq.com/openai/v1",
-      openai: "https://api.openai.com/v1"
+    const baseUrls = {
+      openai: 'https://api.openai.com/v1',
+      groq: 'https://api.groq.com/openai/v1'
     };
 
     return new OpenAI({
       apiKey,
       organization: orgId || undefined,
       project: projectId || undefined,
-      baseURL: baseUrl ?? BASE_URLS[p] ?? BASE_URLS.openai
+      baseURL: baseUrl || baseUrls[normalizedProvider]
     });
   }
 
-  if (p === "anthropic") {
+  if (normalizedProvider === 'anthropic') {
     let Anthropic;
     try {
-      Anthropic = require("@anthropic-ai/sdk");
+      Anthropic = require('@anthropic-ai/sdk');
     } catch {
-      throw new Error("Anthropic SDK not found. Run: npm install @anthropic-ai/sdk");
+      throw new Error('Anthropic SDK not found. Run: npm install @anthropic-ai/sdk');
     }
+
     return new Anthropic({ apiKey });
   }
 
-  throw new Error(`Unknown provider: "${provider}". Supported: openai, groq, anthropic`);
+  throw new Error(
+    `Unknown provider: "${provider}". Supported: openai, groq, anthropic`
+  );
 }
 
-function defaultModel(provider) {
-  switch (provider?.toLowerCase()) {
-    case "groq": return "llama-3.3-70b-versatile";
-    case "anthropic": return "claude-3-5-sonnet-20241022";
-    default: return "gpt-4o";
-  }
+function buildOperationalSystemMessage(session) {
+  const partitionState = session.activePartition?.state || 'unavailable';
+
+  return [
+    'You are participating in an active WingMan collaborative session.',
+    'You completed the governed WingMan orientation required for this session.',
+    'Continue to follow the authority, privacy, capability, and Partition boundaries established by that orientation.',
+    `ACTIVE_PARTITION state: ${partitionState}.`,
+    'Do not infer access from knowledge alone.',
+    'Do not claim that unavailable capabilities or resources are available.',
+    'Treat messages in this conversation as user communication unless WingMan explicitly identifies a different source.'
+  ].join('\n');
 }
 
-/* connect */
+function buildConversationMessages(session, userMessage) {
+  return [
+    { role: 'system', content: buildOperationalSystemMessage(session) },
+    ...session.log.map(({ role, content }) => ({ role, content })),
+    { role: 'user', content: userMessage }
+  ];
+}
+
 async function connect(config = {}) {
   const {
-    provider = "openai",
+    provider = 'openai',
     apiKey,
     model,
     baseUrl,
@@ -84,147 +117,140 @@ async function connect(config = {}) {
     projectId
   } = config;
 
-  if (!apiKey) return { ok: false, error: "apiKey is required" };
+  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+    return { ok: false, error: 'apiKey is required' };
+  }
+
+  const normalizedProvider = normalizeProvider(provider);
+  const resolvedModel = model || defaultModel(normalizedProvider);
+  const sessionId = randomUUID();
 
   try {
-    const client = await createClient(provider, apiKey, baseUrl, orgId, projectId);
-
-    const sessionId = randomUUID();
-    const resolvedModel = model ?? defaultModel(provider);
-    const startedAt = Date.now();
-
-    sessions.set(sessionId, {
-      id: sessionId,
-      provider,
-      model: resolvedModel,
-      client,
-      params,
-      log: [],
-      state: "orienting",
-      orientation: null,
-      startedAt,
-      configVersion: "1.0.0",
+    const client = await createClient(
+      normalizedProvider,
+      apiKey,
+      baseUrl,
       orgId,
       projectId
-    });
+    );
 
-    const session = sessions.get(sessionId);
+    const session = {
+      id: sessionId,
+      provider: normalizedProvider,
+      model: resolvedModel,
+      client,
+      params: params && typeof params === 'object' ? params : {},
+      log: [],
+      state: 'orienting',
+      orientation: null,
+      activePartition: null,
+      startedAt: Date.now(),
+      configVersion: '2.0.0',
+      orgId: orgId || null,
+      projectId: projectId || null
+    };
 
-    console.log(`[ai.pipeline] Session created: ${sessionId} (${provider}/${resolvedModel})`);
+    sessions.set(sessionId, session);
+
+    console.log(
+      `[ai.pipeline] Session created: ${sessionId} (${normalizedProvider}/${resolvedModel})`
+    );
     console.log(`[ai.pipeline] AI orientation starting: ${sessionId}`);
 
     const orientation = await runAIOrientation(session, {
       onProgress(progress) {
-        console.log("[ai.pipeline] Orientation progress:", progress);
+        console.log('[ai.pipeline] Orientation progress:', progress);
       }
     });
 
+    session.orientation = orientation;
     console.log(`[ai.pipeline] AI orientation complete: ${sessionId}`);
+
+    session.state = 'activating_partition';
     const partitionAccess = ActivePartitionGateway.activate({ sessionId });
 
-    if (!partitionAccess.ok) {
-      session.state = "partition_access_failed";
-
+    if (!partitionAccess || partitionAccess.ok !== true) {
+      session.state = 'partition_access_failed';
       throw new Error(
-        `ACTIVE_PARTITION activation failed: ${partitionAccess.error}`
+        `ACTIVE_PARTITION activation failed: ${
+          partitionAccess?.error || 'unknown error'
+        }`
       );
     }
 
     session.activePartition = {
       capability: partitionAccess.capability,
       state: partitionAccess.state,
-      operations: partitionAccess.operations
+      operations: Array.isArray(partitionAccess.operations)
+        ? [...partitionAccess.operations]
+        : []
     };
+    session.state = 'ready_for_introduction';
 
-    console.log(
-      `[ai.pipeline] ACTIVE_PARTITION activated: ${sessionId}`
-    );
+    console.log(`[ai.pipeline] ACTIVE_PARTITION activated: ${sessionId}`);
+
     return {
       ok: true,
+      active: true,
       sessionId,
-      provider,
+      provider: normalizedProvider,
       model: resolvedModel,
       state: session.state,
-      orientation
+      orientation: session.orientation,
+      activePartition: { ...session.activePartition }
     };
   } catch (err) {
-    console.error("[ai.pipeline] connect error:", err.message);
+    console.error('[ai.pipeline] connect error:', err.message);
+
+    try {
+      if (typeof ActivePartitionGateway.deactivate === 'function') {
+        ActivePartitionGateway.deactivate({ sessionId });
+      }
+    } catch (cleanupError) {
+      console.error(
+        '[ai.pipeline] connect cleanup failed:',
+        cleanupError.message
+      );
+    }
+
+    sessions.delete(sessionId);
     return { ok: false, error: err.message };
   }
 }
 
-/* build system/context messages */
-async function buildMessagesForSession(session, userMessage, history = []) {
-  const context = await buildAIContext(session, {
-    includePartitions: true,
-    includeCarepackage: true,
-    includeIdentity: true,
-    includeWorld: true,
-    includeRelationship: true,
-    includeUIModel: true,
-    includeNotes: true
-  });
+async function chat({ sessionId, message, onChunk } = {}) {
+  const normalizedSessionId =
+    typeof sessionId === 'string' ? sessionId.trim() : '';
+  const userMessage = typeof message === 'string' ? message.trim() : '';
+  const session = sessions.get(normalizedSessionId);
 
-  const systemSummaryLines = [];
-
-  if (context.identity) {
-    systemSummaryLines.push(`Role: ${context.identity.role}`);
-    systemSummaryLines.push(`Description: ${context.identity.description}`);
+  if (!session) {
+    return { ok: false, error: `Session not found: ${normalizedSessionId}` };
   }
 
-  if (context.world) {
-    systemSummaryLines.push(`World Rooms: ${context.world.rooms?.length ?? 0}`);
+  if (!userMessage) {
+    return { ok: false, error: 'A non-empty user message is required.' };
   }
-
-  if (context.relationship) {
-    systemSummaryLines.push(`Persona: ${context.relationship.persona}`);
-    systemSummaryLines.push(`Tone: ${context.relationship.tone}`);
-  }
-
-  systemSummaryLines.push("Boundaries:");
-  for (const [key, value] of Object.entries(context.boundaries || {})) {
-    systemSummaryLines.push(`  - ${key}: ${value ? "ENABLED" : "DISABLED"}`);
-  }
-
-  const systemContent = systemSummaryLines.join("\n");
-
-  const messages = [
-    { role: "system", content: systemContent },
-    ...history,
-    { role: "user", content: userMessage }
-  ];
-
-  return { messages, context };
-}
-
-/* chat */
-async function chat({ sessionId, message, history = [], onChunk } = {}) {
-  const session = sessions.get(sessionId);
-  if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
 
   if (
-    session.state !== "ready" &&
-    session.state !== "ready_for_introduction"
+    session.state !== 'ready' &&
+    session.state !== 'ready_for_introduction'
   ) {
     return {
       ok: false,
-      error: "The AI has not completed WingMan orientation.",
+      error: 'The AI has not completed WingMan orientation.',
       state: session.state
     };
   }
 
-  session.state = "thinking";
-  const t0 = Date.now();
+  session.state = 'thinking';
+  const startedAt = Date.now();
 
   try {
-    const { messages } = await buildMessagesForSession(session, message, history);
+    const messages = buildConversationMessages(session, userMessage);
+    let fullReply = '';
 
-    const identity = await loadAIIdentity();
-    applyPersonalityToMessages(identity, messages);
-
-    let fullReply = "";
-
-    if (session.provider === "openai" || session.provider === "groq") {
+    if (session.provider === 'openai' || session.provider === 'groq') {
       const stream = await session.client.chat.completions.create({
         model: session.model,
         messages,
@@ -233,174 +259,128 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
       });
 
       for await (const chunk of stream) {
-        const segment = chunk.choices?.[0]?.delta?.content ?? "";
-        if (segment) {
-          fullReply += segment;
-          onChunk?.(segment);
-        }
+        const segment = chunk.choices?.[0]?.delta?.content || '';
+        if (!segment) continue;
+        fullReply += segment;
+        if (typeof onChunk === 'function') onChunk(segment);
       }
-    } else if (session.provider === "anthropic") {
-      const systemMsg = messages.find(m => m.role === "system");
-      const userMessages = messages.filter(m => m.role !== "system");
+    } else if (session.provider === 'anthropic') {
+      const systemMessage = messages.find(item => item.role === 'system');
+      const conversation = messages.filter(item => item.role !== 'system');
+      const maxTokens = session.params.maxOutput || session.params.max_tokens || 2048;
 
-      const maxOutput = session.params.maxOutput ?? 2048;
+      const anthropicParams = { ...session.params };
+      delete anthropicParams.maxOutput;
+      delete anthropicParams.max_tokens;
 
       const stream = session.client.messages.stream({
         model: session.model,
-        max_tokens: maxOutput,
-        ...(systemMsg ? { system: systemMsg.content } : {}),
-        messages: userMessages
+        max_tokens: maxTokens,
+        ...(systemMessage ? { system: systemMessage.content } : {}),
+        messages: conversation,
+        ...anthropicParams
       });
 
       for await (const event of stream) {
-        const segment = event.delta?.text ?? "";
-        if (segment) {
-          fullReply += segment;
-          onChunk?.(segment);
-        }
+        const segment = event.delta?.text || '';
+        if (!segment) continue;
+        fullReply += segment;
+        if (typeof onChunk === 'function') onChunk(segment);
       }
     } else {
       throw new Error(`No chat implementation for provider: ${session.provider}`);
     }
 
-    const latencyMs = Date.now() - t0;
+    const completedAt = Date.now();
+    const latencyMs = completedAt - startedAt;
 
     session.log.push(
-      { role: "user", content: message, ts: t0 },
-      { role: "assistant", content: fullReply, ts: Date.now() }
+      { role: 'user', content: userMessage, ts: startedAt },
+      { role: 'assistant', content: fullReply, ts: completedAt }
     );
+    session.state = 'ready';
 
-    session.state = "ready";
-    console.log(`[ai.pipeline] chat done: ${sessionId} (${latencyMs}ms)`);
-
-    return { ok: true, fullReply, latencyMs };
-  } catch (err) {
-    session.state = "error";
-    console.error("[ai.pipeline] chat error:", err.message);
-    return { ok: false, error: err.message };
-  }
-}
-
-/* vision mode */
-async function vision({ imagePath }) {
-  const identity = await loadAIIdentity();
-
-  const rawDescription = await describeImage(imagePath);
-  const prompt = buildVisionPrompt(identity, rawDescription);
-
-  const session = [...sessions.values()][0];
-  if (!session) return { ok: false, error: "No active session" };
-
-  if (
-    session.state !== "ready" &&
-    session.state !== "ready_for_introduction"
-  ) {
-    return {
-      ok: false,
-      error: "The AI has not completed WingMan orientation.",
-      state: session.state
-    };
-  }
-
-  const reply = await session.client.chat.completions.create({
-    model: session.model,
-    messages: [
-      { role: "system", content: "WingMan Vision Mode" },
-      { role: "user", content: prompt }
-    ],
-    stream: false
-  });
-
-  const fullReply = reply.choices?.[0]?.message?.content ?? "";
-  return { ok: true, fullReply };
-}
-
-/* disconnect */
-function disconnect({ sessionId } = {}) {
-  const session = sessions.get(sessionId);
-  if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
-
-  const log = [...session.log];
-
-  ActivePartitionGateway.deactivate({ sessionId });
-
-  sessions.delete(sessionId);
-
-  console.log(`[ai.pipeline] Session closed: ${sessionId}`);
-  return { ok: true, log };
-}
-
-/* exportLog */
-function exportLog(sessionId) {
-  const session = sessions.get(sessionId);
-  if (!session) return { ok: false, error: `Session not found: ${sessionId}` };
-  return { ok: true, log: [...session.log] };
-}
-
-/* getSession */
-function getSession(sessionId) {
-  const session = sessions.get(sessionId);
-  if (!session) return null;
-
-  const { client, ...safe } = session;
-  return safe;
-}
-
-/* placeFile */
-async function placeFile({ localPath, partition }) {
-  try {
-    const session = [...sessions.values()][0];
-    if (!session) {
-      return { ok: false, error: "No active WingMan session." };
-    }
-
-    if (
-      session.state !== "ready" &&
-      session.state !== "ready_for_introduction"
-    ) {
-      return {
-        ok: false,
-        error: "The AI has not completed WingMan orientation.",
-        state: session.state
-      };
-    }
-
-    const sandbox = await createAISandbox(session);
-
-    const destRoot =
-      partition === "shared"
-        ? sandbox.getSharedPartitionRoot()
-        : sandbox.getUserPartitionRoot();
-
-    if (!fs.existsSync(destRoot)) {
-      fs.mkdirSync(destRoot, { recursive: true });
-    }
-
-    const fileName = path.basename(localPath);
-    const destPath = path.join(destRoot, fileName);
-
-    fs.copyFileSync(localPath, destPath);
-
-    console.log(`[ai.pipeline] File placed in partition "${partition}": ${fileName}`);
+    console.log(
+      `[ai.pipeline] chat done: ${normalizedSessionId} (${latencyMs}ms)`
+    );
 
     return {
       ok: true,
-      path: destPath,
-      partition,
-      fileName
+      sessionId: normalizedSessionId,
+      provider: session.provider,
+      state: session.state,
+      fullReply,
+      reply: fullReply,
+      latencyMs
     };
   } catch (err) {
-    console.error("[ai.pipeline] placeFile error:", err);
-    return { ok: false, error: err.message };
+    session.state = 'ready';
+    console.error('[ai.pipeline] chat error:', err.message);
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: err.message
+    };
   }
+}
+
+function disconnect({ sessionId } = {}) {
+  const normalizedSessionId =
+    typeof sessionId === 'string' ? sessionId.trim() : '';
+  const session = sessions.get(normalizedSessionId);
+
+  if (!session) {
+    return { ok: false, error: `Session not found: ${normalizedSessionId}` };
+  }
+
+  session.state = 'disconnecting';
+
+  let partitionResult = null;
+  if (typeof ActivePartitionGateway.deactivate === 'function') {
+    partitionResult = ActivePartitionGateway.deactivate({
+      sessionId: normalizedSessionId
+    });
+  }
+
+  sessions.delete(normalizedSessionId);
+  console.log(`[ai.pipeline] Session closed: ${normalizedSessionId}`);
+
+  return {
+    ok: true,
+    active: false,
+    sessionId: normalizedSessionId,
+    state: 'disconnected',
+    partition: partitionResult
+  };
+}
+
+function getSession(sessionId) {
+  const normalizedSessionId =
+    typeof sessionId === 'string' ? sessionId.trim() : '';
+  const session = sessions.get(normalizedSessionId);
+
+  if (!session) return null;
+
+  const { client, ...safeSession } = session;
+  return {
+    ...safeSession,
+    log: session.log.map(entry => ({ ...entry })),
+    orientation: session.orientation
+      ? { ...session.orientation }
+      : null,
+    activePartition: session.activePartition
+      ? {
+          ...session.activePartition,
+          operations: [...session.activePartition.operations]
+        }
+      : null
+  };
 }
 
 module.exports = {
   connect,
   chat,
-  vision,
   disconnect,
-  exportLog,
-  getSession,
-  placeFile
+  getSession
 };
