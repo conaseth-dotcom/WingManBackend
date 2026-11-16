@@ -43,13 +43,6 @@ try {
   PersonalityEngine = null;
 }
 
-let CarepackageLoader;
-try {
-  CarepackageLoader = require("./ai.loader.cjs");
-} catch {
-  CarepackageLoader = null;
-}
-
 let MemoryLoader;
 try {
   MemoryLoader = require("./ai.memory.loader.cjs");
@@ -109,21 +102,13 @@ async function startAIOnboarding({ systemSettings = {}, partitionPaths = null } 
 
   const phases = {};
 
-  // Phase 1 - Load carepackage
-  let carepackage = null;
-  if (CarepackageLoader) {
-    phases.carepackage = await safeCall(
-      "CarepackageLoader.loadCarepackage",
-      CarepackageLoader.loadCarepackage ||
-        CarepackageLoader.load ||
-        CarepackageLoader.initialize,
-      { systemSettings }
-    );
-    carepackage = phases.carepackage.value;
-  } else {
-    logger.warn("[AI-Startup] Carepackage loader missing - using fallback personality only");
-    phases.carepackage = { ok: false, available: false };
-  }
+  // Phase 1 - Governed AI orientation is performed by ai.pipeline.cjs.
+  // Startup does not inspect or inject private AI Partition notes.
+  const carepackage = null;
+  phases.carepackage = {
+    ok: true,
+    available: false
+  };
 
   // Phase 2 - Boot relationship engine
   if (RelationshipBootstrap) {

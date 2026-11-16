@@ -9,7 +9,6 @@
 
 const { loadAIMemory } = require("./ai.memory.loader.cjs");
 const { loadRelationshipConfig } = require("../BlackBox/relationship/runtime/relationship.loader.cjs");
-const { loadAiNotes } = require("./ai.loader.cjs");
 const { loadOnboardingPackage, loadAwarenessPackage, mergeCarePackage } =
   require("./identity/ai.carepackage.cjs");
 
@@ -51,9 +50,6 @@ async function loadAIIdentity() {
     "relationship.config.json"
   );
 
-  // 3. AI continuity notes (memory, scratch, long-term notes)
-  const aiNotes = await loadAiNotes();
-
   // 4. Load AI memory (preferences, onboarding answers, personality)
   const memory = await loadAIMemory();
 
@@ -65,7 +61,6 @@ async function loadAIIdentity() {
     carepackageVersion: awareness.versionSnapshot,
 
     relationship,
-    notes: aiNotes,
 
     // ⭐ MVP-critical: AI memory
     memory
