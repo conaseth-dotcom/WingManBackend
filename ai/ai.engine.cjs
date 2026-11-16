@@ -1,80 +1,155 @@
-// ai.engine.cjs — unified WingMan AI engine (pipeline-powered)
+/* ========================================================================
+   WingMan Backend File
 
-// ────────────────────────────────────────────────────────────────
-// Imports: Real AI pipeline + context builder
-// ────────────────────────────────────────────────────────────────
-import * as AIPipeline from "./ai.pipeline.cjs";
-import * as AIContextBuilder from "./ai.context.builder.cjs";
+   Alias: @backend-ai/ai.engine.cjs
+   Role: Authoritative persistent-session facade for the WingMan AI pipeline.
 
-// ────────────────────────────────────────────────────────────────
-// Public: buildContext(options)
-// ────────────────────────────────────────────────────────────────
-export async function buildContext(options = {}) {
+   Authority:
+     - The backend creates and owns AI sessions.
+     - The backend performs governed AI orientation.
+     - The backend activates and deactivates session capabilities.
+     - The frontend may request these operations, but does not perform them.
+========================================================================= */
+
+'use strict';
+
+const AIPipeline = require('./ai.pipeline.cjs');
+
+/* ------------------------------------------------------------------------
+   CONNECT
+
+   Creates one persistent backend-owned AI session. AIPipeline.connect()
+   performs provider connection, governed orientation, and capability setup.
+------------------------------------------------------------------------ */
+async function connect({
+  provider = 'openai',
+  apiKey,
+  model,
+  baseUrl,
+  params = {},
+  orgId,
+  projectId
+} = {}) {
   try {
-    const context = await AIContextBuilder.buildAIContext(null, {
-      includePartitions:   options.includeFiles ?? true,
-      includeCarepackage:  true,
-      includeIdentity:     true,
-      includeWorld:        true,
-      includeRelationship: true,
-      includeProjectState: true,
-      includeUIModel:      true,
-      includeNotes:        true
+    const result = await AIPipeline.connect({
+      provider,
+      apiKey,
+      model,
+      baseUrl,
+      params,
+      orgId,
+      projectId
     });
 
-    return context;
+    if (!result || result.ok !== true) {
+      return {
+        ok: false,
+        error: result?.error || 'The AI pipeline did not create a session.'
+      };
+    }
+
+    return {
+      ok: true,
+      active: true,
+      sessionId: result.sessionId,
+      provider: result.provider,
+      model: result.model,
+      state: result.state,
+      orientation: result.orientation
+    };
   } catch (err) {
-    console.error("[AIEngine] buildContext failed:", err);
+    console.error('[AIEngine] connect failed:', err);
     return { ok: false, error: err.message };
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-// Public: runRequest(prompt, context)
-// ────────────────────────────────────────────────────────────────
-export async function runRequest(prompt, context = {}) {
+/* ------------------------------------------------------------------------
+   CHAT
+
+   Uses an existing backend-owned session. It does not create, orient, or
+   close a session. Conversation continuity belongs to the backend session.
+------------------------------------------------------------------------ */
+async function chat({ sessionId, message, history = [], onChunk } = {}) {
   try {
-    // 1. Create a provider session
-    const session = await AIPipeline.connect({
-      provider: context.provider ?? "openai",
-      apiKey:   context.apiKey,
-      model:    context.model,
-      params:   context.params
-    });
-
-    if (!session.ok) {
-      return { ok: false, error: session.error };
+    if (typeof sessionId !== 'string' || !sessionId.trim()) {
+      return { ok: false, error: 'A valid AI sessionId is required.' };
     }
 
-    const sessionId = session.sessionId;
-
-    // 2. Run chat through the real pipeline
-    const reply = await AIPipeline.chat({
-      sessionId,
-      message: prompt,
-      history: context.history ?? [],
-      onChunk: (chunk) => {
-        // Stream output chunks to renderer
-        const win = globalThis.mainWindow;
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("ai:replyChunk", chunk);
-        }
-      }
-    });
-
-    // 3. Close session
-    AIPipeline.disconnect({ sessionId });
-
-    // 4. Push final reply to renderer
-    const win = globalThis.mainWindow;
-    if (win && !win.isDestroyed()) {
-      win.webContents.send("ai:reply", reply);
+    if (typeof message !== 'string' || !message.trim()) {
+      return { ok: false, error: 'A non-empty user message is required.' };
     }
 
-    return reply;
-
+    return await AIPipeline.chat({
+      sessionId: sessionId.trim(),
+      message: message.trim(),
+      history: Array.isArray(history) ? history : [],
+      onChunk: typeof onChunk === 'function' ? onChunk : undefined
+    });
   } catch (err) {
-    console.error("[AIEngine] runRequest failed:", err);
+    console.error('[AIEngine] chat failed:', err);
     return { ok: false, error: err.message };
   }
 }
+
+/* ------------------------------------------------------------------------
+   STATUS
+------------------------------------------------------------------------ */
+function status({ sessionId } = {}) {
+  try {
+    if (typeof sessionId !== 'string' || !sessionId.trim()) {
+      return { ok: false, error: 'A valid AI sessionId is required.' };
+    }
+
+    const session = AIPipeline.getSession(sessionId.trim());
+
+    if (!session) {
+      return {
+        ok: true,
+        active: false,
+        sessionId: sessionId.trim(),
+        state: 'disconnected'
+      };
+    }
+
+    return {
+      ok: true,
+      active: true,
+      sessionId: session.id,
+      provider: session.provider,
+      model: session.model,
+      state: session.state,
+      orientation: session.orientation,
+      activePartition: session.activePartition || null,
+      startedAt: session.startedAt
+    };
+  } catch (err) {
+    console.error('[AIEngine] status failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+/* ------------------------------------------------------------------------
+   DISCONNECT
+
+   Closes the exact backend-owned session. AIPipeline.disconnect() also
+   removes that session's ACTIVE_PARTITION authorization.
+------------------------------------------------------------------------ */
+function disconnect({ sessionId } = {}) {
+  try {
+    if (typeof sessionId !== 'string' || !sessionId.trim()) {
+      return { ok: false, error: 'A valid AI sessionId is required.' };
+    }
+
+    return AIPipeline.disconnect({ sessionId: sessionId.trim() });
+  } catch (err) {
+    console.error('[AIEngine] disconnect failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+module.exports = {
+  connect,
+  chat,
+  status,
+  disconnect
+};
