@@ -29,32 +29,11 @@ try {
   ProviderFactory = null;
 }
 
-let AIRuntime;
-try {
-  AIRuntime = require("./ai.runtime.cjs");
-} catch {
-  AIRuntime = null;
-}
-
 let PersonalityEngine;
 try {
   PersonalityEngine = require("./ai.personality.cjs");
 } catch {
   PersonalityEngine = null;
-}
-
-let MemoryLoader;
-try {
-  MemoryLoader = require("./ai.memory.loader.cjs");
-} catch {
-  MemoryLoader = null;
-}
-
-let ContextBuilder;
-try {
-  ContextBuilder = require("./ai.context.builder.cjs");
-} catch {
-  ContextBuilder = null;
 }
 
 let BlackBoxRuntime;
@@ -138,18 +117,6 @@ async function startAIOnboarding({ systemSettings = {}, partitionPaths = null } 
     phases.personality = { ok: false, available: false };
   }
 
-  if (MemoryLoader) {
-    phases.memory = await safeCall(
-      "MemoryLoader.initializeMemory",
-      MemoryLoader.initializeMemory ||
-        MemoryLoader.initialize ||
-        MemoryLoader.load,
-      { systemSettings, partitionPaths }
-    );
-  } else {
-    phases.memory = { ok: false, available: false };
-  }
-
   // Phase 4 - Initialize providers + runtime
   if (ProviderFactory) {
     phases.providers = await safeCall(
@@ -161,29 +128,6 @@ async function startAIOnboarding({ systemSettings = {}, partitionPaths = null } 
     );
   } else {
     phases.providers = { ok: false, available: false };
-  }
-
-  if (AIRuntime) {
-    phases.runtime = await safeCall(
-      "AIRuntime.initializeRuntime",
-      AIRuntime.initializeRuntime || AIRuntime.initialize || AIRuntime.init,
-      { systemSettings }
-    );
-  } else {
-    phases.runtime = { ok: false, available: false };
-  }
-
-  // Phase 5 - Build context
-  if (ContextBuilder) {
-    phases.context = await safeCall(
-      "ContextBuilder.initializeContext",
-      ContextBuilder.initializeContext ||
-        ContextBuilder.initialize ||
-        ContextBuilder.buildContext,
-      { systemSettings, partitionPaths, carepackage }
-    );
-  } else {
-    phases.context = { ok: false, available: false };
   }
 
   // Phase 6 - Initialize BlackBox

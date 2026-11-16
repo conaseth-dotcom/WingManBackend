@@ -292,25 +292,8 @@
   app.locals.providers = PROVIDERS;
   console.log("[WM-AI] Provider map initialised:", Object.keys(PROVIDERS));
   
-  let aiRuntime, aiPipeline, personality;
-
-  // Runtime
-  console.log("[WM-AI] Loading ai.runtime.cjs…");
-  try {
-    let mod = require(r('ai/ai.runtime.cjs'));
-    aiRuntime = mod.default || mod;
-    if (typeof aiRuntime.init === 'function') {
-      console.log("[WM-AI] Initialising AI runtime…");
-      const result = aiRuntime.init({ providers: PROVIDERS, eventBus, logger });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] AI runtime init completed");
-    }
-    logger.info('AI Runtime initialised');
-  } catch (e) {
-    logger.warn('AI Runtime unavailable', { err: e.message });
-    console.log("[WM-AI] AI Runtime unavailable:", e.message);
-  }
-
+  let aiPipeline, personality;
+  
   // Pipeline
   console.log("[WM-AI] Loading OnboardingPipeline.cjs…");
   try {
