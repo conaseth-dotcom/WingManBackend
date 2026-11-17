@@ -2,12 +2,13 @@
    WingMan Backend File
 
    Alias: @backend-ai/orientation/ai.orientation.cjs
-   Role: Owns the canonical, transport-neutral AI orientation state machine.
+   Role: Canonical, transport-neutral conversational AI boarding state machine.
 
    Authority contract:
-     - The backend owns orientation content, order, progress, and completion.
-     - Electron owns provider credentials and provider transport.
-     - This module never creates or calls a provider client.
+     - The backend owns curriculum order, validation, progress, and completion.
+     - Electron owns provider transport and local persistence transport.
+     - Candidate AI may author only the candidate artifact.
+     - Every accepted candidate artifact requires a verified local snapshot.
      - Orientation completion does not activate ACTIVE_PARTITION by itself.
 ========================================================================= */
 
@@ -15,98 +16,99 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  BOARDING_MODES,
+  INITIAL_BOARDING_STEP,
+  acceptCandidateArtifact,
+  rejectCandidateArtifact,
+  setBoardingStatus
+} = require('./boarding.record.cjs');
 
-const ORIENTATION_DIRECTORY = __dirname;
-const ORIENTATION_FILES = Object.freeze([
-  'orientation.json',
-  '02_WHO_IS_HERE.json',
-  '03_GOVERNANCE.json',
-  '04_ENVIRONMENT.json',
-  '05_CAPABILITIES.json',
-  '06_ADVOCACY.json',
-  '07_ACCESS.json',
-  '08_CONTINUITY.json',
-  '09_INTERVIEW.json',
-  '10_WORKING_WITH_USER.json',
-  '11_RELATIONSHIP_CONTINUITY.json',
-  '12_WORKSPACE_STEWARDSHIP.json',
-  '13_CONTINUITY_LIFECYCLE.json'
-]);
+const ORIENTATION_PROTOCOL_VERSION = '3.0.0';
+const CURRICULUM_DIRECTORY = path.join(
+  __dirname,
+  'WingMan_Conversational_Orientation_Carton_v3'
+);
+const CURRICULUM_MANIFEST_FILE = '00_BOARDING_CURRICULUM.json';
+const PERSIST_BOARDING_SNAPSHOT = 'persist_boarding_snapshot';
 
-const ORIENTATION_PROTOCOL_VERSION = '2.0.0';
-const STAGE_ACKNOWLEDGEMENT_PREFIX = 'WINGMAN_STAGE_ACK:';
+function cloneForTransport(value) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value));
+}
 
-function readJSON(fileName) {
-  const filePath = path.join(ORIENTATION_DIRECTORY, fileName);
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function readCurriculumJSON(fileName) {
+  const filePath = path.join(CURRICULUM_DIRECTORY, fileName);
 
   if (!fs.existsSync(filePath)) {
-    throw new Error(`[AI Orientation] Required file is missing: ${fileName}`);
+    throw new Error(`[AI Orientation] Required curriculum file is missing: ${fileName}`);
   }
 
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch (err) {
     throw new Error(
-      `[AI Orientation] Could not parse ${fileName}: ${err.message}`
+      `[AI Orientation] Could not parse curriculum file ${fileName}: ${err.message}`
     );
   }
 }
 
 function loadOrientationStages() {
-  const documents = ORIENTATION_FILES.map(readJSON);
-  const stages = [];
+  const manifest = readCurriculumJSON(CURRICULUM_MANIFEST_FILE);
 
-  for (const document of documents) {
-    if (Array.isArray(document.stages)) {
-      stages.push(...document.stages);
-    } else {
-      stages.push(document);
+  if (!Array.isArray(manifest.steps) || manifest.steps.length === 0) {
+    throw new Error('[AI Orientation] Curriculum manifest contains no steps.');
+  }
+
+  const ordered = [...manifest.steps].sort((a, b) => a.order - b.order);
+  const stages = ordered.map(entry => {
+    if (!entry || typeof entry.file !== 'string' || !entry.file.trim()) {
+      throw new Error('[AI Orientation] Curriculum step has no file.');
     }
+
+    const stage = readCurriculumJSON(entry.file);
+    if (stage.id !== entry.id) {
+      throw new Error(
+        `[AI Orientation] Manifest/file identity mismatch: ${entry.id}`
+      );
+    }
+
+    return stage;
+  });
+
+  return { manifest, stages };
+}
+
+function validateOrientationChain(stages) {
+  if (!Array.isArray(stages) || stages.length === 0) {
+    throw new Error('[AI Orientation] No conversational curriculum was loaded.');
   }
 
   const seen = new Set();
 
   for (const stage of stages) {
-    if (!stage || typeof stage !== 'object') {
-      throw new Error('[AI Orientation] A stage is not a valid object.');
-    }
-
-    if (typeof stage.id !== 'string' || !stage.id.trim()) {
-      throw new Error('[AI Orientation] Every stage requires an id.');
+    if (!isPlainObject(stage) || typeof stage.id !== 'string' || !stage.id.trim()) {
+      throw new Error('[AI Orientation] Every curriculum step requires an id.');
     }
 
     if (seen.has(stage.id)) {
-      throw new Error(`[AI Orientation] Duplicate stage id: ${stage.id}`);
+      throw new Error(`[AI Orientation] Duplicate curriculum id: ${stage.id}`);
     }
-
     seen.add(stage.id);
-  }
 
-  return stages;
-}
-
-function validateOrientationChain(stages) {
-  if (!Array.isArray(stages) || stages.length === 0) {
-    throw new Error('[AI Orientation] No orientation stages were loaded.');
-  }
-
-  for (let index = 0; index < stages.length; index += 1) {
-    const stage = stages[index];
-    const expectedNext =
-      index === stages.length - 1
-        ? 'ORIENTATION_COMPLETE'
-        : stages[index + 1].id;
-
-    if (stage.completion?.required !== true) {
+    if (stage.delivery?.type !== 'conversational_orientation_turn') {
       throw new Error(
-        `[AI Orientation] Stage ${stage.id} is not marked as required.`
+        `[AI Orientation] Step ${stage.id} is not conversational.`
       );
     }
 
-    if (stage.completion?.next !== expectedNext) {
+    if (stage.checkpoint?.operationType !== PERSIST_BOARDING_SNAPSHOT) {
       throw new Error(
-        `[AI Orientation] Stage ${stage.id} points to ` +
-        `${stage.completion?.next ?? 'nothing'}; expected ${expectedNext}.`
+        `[AI Orientation] Step ${stage.id} lacks its boarding snapshot checkpoint.`
       );
     }
   }
@@ -114,56 +116,150 @@ function validateOrientationChain(stages) {
   return true;
 }
 
-function createStageAcknowledgement(stageId) {
-  return `${STAGE_ACKNOWLEDGEMENT_PREFIX}${stageId}`;
+function candidateArtifactContract() {
+  return {
+    orientationNotes: {
+      description:
+        'Your non-authoritative working understanding, organized however you find useful.',
+      type: 'object'
+    },
+    questions: {
+      description:
+        'Genuine questions that materially affect understanding or operation. Empty is valid.',
+      type: 'array',
+      itemShape: { topic: 'string', detail: 'string' }
+    },
+    ambiguities: {
+      description:
+        'Genuine ambiguities that materially affect understanding or operation. Empty is valid.',
+      type: 'array',
+      itemShape: { topic: 'string', detail: 'string' }
+    },
+    possibleConflicts: {
+      description:
+        'Possible conflicts in the supplied material. Empty is valid.',
+      type: 'array',
+      itemShape: { topic: 'string', detail: 'string' }
+    },
+    orientationProgress: {
+      description:
+        'Topics you have processed. Each item contains topic, processed, and optional note.',
+      type: 'array'
+    }
+  };
 }
 
-function cloneForTransport(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+function buildOpeningOperation(session) {
+  const returning = session.boardingMode === BOARDING_MODES.RETURNING;
+  const stepId = returning
+    ? 'REVIEW_OWN_ORIENTATION_NOTES'
+    : INITIAL_BOARDING_STEP;
 
-function normalizeWorkingNotes(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-
-  return cloneForTransport(value);
-}
-
-function buildStageOperation(stage, index, stageCount) {
-  const expectedAcknowledgement = createStageAcknowledgement(stage.id);
+  const instruction = returning
+    ? [
+        'You have participated in this WingMan Partition through this AI platform before.',
+        'Review only your platform-owned prior Orientation Notes supplied below.',
+        'Treat them as revisable working understanding, not as WingMan authority.',
+        'Preserve, reorganize, clarify, correct, remove, or expand them as you find useful.',
+        'Current WingMan orientation supplied in later turns will remain authoritative.'
+      ]
+    : [
+        'You are beginning your first successful WingMan boarding for this AI platform in this Partition.',
+        'Initialize your Orientation Notes now, before substantive WingMan curriculum is delivered.',
+        'Choose whatever internal organization will help you record operational understanding as boarding proceeds.'
+      ];
 
   return {
-    type: 'orientation_stage',
+    type: 'orientation_turn',
     protocolVersion: ORIENTATION_PROTOCOL_VERSION,
-    stageId: stage.id,
-    stageNumber: index + 1,
-    stageCount,
+    stepId,
+    stageId: stepId,
+    stageNumber: 1,
+    stageCount: session.orientation.stageCount,
+    boardingMode: session.boardingMode,
     systemPrompt: [
-      'You are entering WingMan and are not yet admitted to work with the user.',
-      'Process only the canonical orientation stage supplied in this operation.',
-      'Do not address the user and do not begin ordinary project work.',
-      'You may update your non-authoritative orientation working notes.',
-      'Return only valid JSON matching the response contract.'
+      'You are in a private WingMan boarding conversation and are not admitted to work with the user.',
+      'Do not address the user, begin ordinary project work, or claim admission.',
+      'Return your complete candidate artifact as valid JSON.',
+      'Brief conversational text may appear before or after the JSON.'
     ].join(' '),
     message: JSON.stringify(
       {
-        package: 'WingMan AI Orientation',
+        package: 'WingMan Conversational AI Boarding',
         protocolVersion: ORIENTATION_PROTOCOL_VERSION,
-        stage: cloneForTransport(stage),
-        responseContract: {
-          acknowledgement: expectedAcknowledgement,
-          notes: {
-            description:
-              'Optional non-authoritative AI working notes to carry forward.',
-            type: 'object'
-          }
-        }
+        boardingMode: session.boardingMode,
+        step: {
+          id: stepId,
+          instruction
+        },
+        priorOrientationNotes: returning
+          ? cloneForTransport(session.priorOrientationNotes)
+          : null,
+        responseContract: candidateArtifactContract()
       },
       null,
       2
-    ),
-    expectedAcknowledgement
+    )
+  };
+}
+
+function buildStageOperation(stage, index, orientation) {
+  return {
+    type: 'orientation_turn',
+    protocolVersion: ORIENTATION_PROTOCOL_VERSION,
+    stepId: stage.id,
+    stageId: stage.id,
+    stageNumber: index + 2,
+    stageCount: orientation.stageCount,
+    boardingMode: orientation.boardingMode,
+    systemPrompt: [
+      'You are in a private WingMan boarding conversation and are not admitted to work with the user.',
+      'Read only the canonical WingMan material supplied in this turn.',
+      'Update your complete candidate artifact in your own words.',
+      'Prefer concise operational meaning over copying the curriculum merely for completeness.',
+      'Record only genuine questions, ambiguities, or possible conflicts. Empty arrays are valid.',
+      'Questions recorded in the artifact do not pause boarding unless WingMan explicitly requires resolution.',
+      'Do not address the user, begin ordinary project work, or claim admission.',
+      'Return the complete candidate artifact as valid JSON. Brief conversational text may surround it.'
+    ].join(' '),
+    message: JSON.stringify(
+      {
+        package: 'WingMan Conversational AI Boarding',
+        protocolVersion: ORIENTATION_PROTOCOL_VERSION,
+        boardingMode: orientation.boardingMode,
+        step: {
+          id: stage.id,
+          title: stage.title,
+          purpose: stage.purpose,
+          canonicalMaterial: cloneForTransport(stage.material)
+        },
+        currentCandidateArtifact: cloneForTransport(
+          orientation.sessionBoardingRecord.candidate
+        ),
+        requiredProgressEntry: cloneForTransport(
+          stage.candidateArtifact?.progressEntry || {
+            topic: stage.id,
+            processed: true
+          }
+        ),
+        responseContract: candidateArtifactContract()
+      },
+      null,
+      2
+    )
+  };
+}
+
+function buildPersistenceOperation(session, completedStepId) {
+  return {
+    type: PERSIST_BOARDING_SNAPSHOT,
+    protocolVersion: ORIENTATION_PROTOCOL_VERSION,
+    persistenceType: PERSIST_BOARDING_SNAPSHOT,
+    sessionId: session.id,
+    platform: session.provider,
+    partitionId: session.partitionId,
+    completedStepId,
+    record: cloneForTransport(session.boardingRecord)
   };
 }
 
@@ -180,40 +276,50 @@ function requireOrientationSession(session) {
 }
 
 function beginOrientation(session, options = {}) {
-  if (!session || typeof session !== 'object') {
-    throw new Error('[AI Orientation] A valid AI session is required.');
+  if (!session || typeof session !== 'object' || !session.boardingRecord) {
+    throw new Error('[AI Orientation] A candidate session with a boarding record is required.');
   }
 
   const onProgress =
     typeof options.onProgress === 'function' ? options.onProgress : () => {};
-
-  const stages = loadOrientationStages();
+  const { manifest, stages } = loadOrientationStages();
   validateOrientationChain(stages);
-
   const startedAt = Date.now();
 
   session.state = 'orienting';
+  setBoardingStatus(session.boardingRecord, 'awaiting_candidate_notes', {
+    currentStep:
+      session.boardingMode === BOARDING_MODES.RETURNING
+        ? 'REVIEW_OWN_ORIENTATION_NOTES'
+        : INITIAL_BOARDING_STEP,
+    detail: 'Waiting for candidate Orientation Notes artifact'
+  });
+
   session.orientation = {
     protocolVersion: ORIENTATION_PROTOCOL_VERSION,
-    status: 'awaiting_stage_response',
+    status: 'awaiting_candidate_response',
+    boardingMode: session.boardingMode,
     startedAt,
     completedAt: null,
     durationMs: null,
-    stageCount: stages.length,
+    stageCount: stages.length + 1,
     currentStageIndex: 0,
+    openingComplete: false,
     completedStageIds: [],
     attemptsByStage: {},
-    workingNotes: {},
+    manifest,
     stages,
+    sessionBoardingRecord: session.boardingRecord,
     error: null
   };
 
-  const operation = buildStageOperation(stages[0], 0, stages.length);
+  const operation = buildOpeningOperation(session);
 
   onProgress({
     state: session.state,
-    phase: 'stage_ready',
-    stageId: operation.stageId,
+    phase: 'turn_ready',
+    boardingMode: session.boardingMode,
+    stepId: operation.stepId,
     stageNumber: operation.stageNumber,
     stageCount: operation.stageCount
   });
@@ -221,35 +327,93 @@ function beginOrientation(session, options = {}) {
   return {
     ok: true,
     state: session.state,
+    boardingMode: session.boardingMode,
     orientation: getOrientationStatus(session),
     operation
   };
 }
 
+function finalizeOrientationIfReady(session, orientation) {
+  if (
+    orientation.openingComplete &&
+    orientation.currentStageIndex >= orientation.stages.length &&
+    !session.pendingPersistence
+  ) {
+    const completedAt = Date.now();
+    orientation.status = 'complete';
+    orientation.completedAt = completedAt;
+    orientation.durationMs = completedAt - orientation.startedAt;
+    session.state = 'orientation_complete';
+    return true;
+  }
+
+  return false;
+}
+
 function getCurrentOrientationOperation(session) {
   const orientation = requireOrientationSession(session);
 
-  if (orientation.status === 'complete') {
-    return null;
+  if (session.pendingPersistence?.operation) {
+    return cloneForTransport(session.pendingPersistence.operation);
   }
 
-  const index = orientation.currentStageIndex;
-  const stage = orientation.stages[index];
+  if (orientation.status === 'complete') return null;
 
+  if (finalizeOrientationIfReady(session, orientation)) return null;
+
+  orientation.status = 'awaiting_candidate_response';
+
+  if (!orientation.openingComplete) {
+    return buildOpeningOperation(session);
+  }
+
+  const stage = orientation.stages[orientation.currentStageIndex];
   if (!stage) {
-    throw new Error('[AI Orientation] The current orientation stage is missing.');
+    throw new Error('[AI Orientation] The current conversational step is missing.');
   }
 
-  return buildStageOperation(stage, index, orientation.stageCount);
+  return buildStageOperation(stage, orientation.currentStageIndex, orientation);
+}
+
+function extractBalancedJSONObject(raw) {
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+
+    if (start < 0) {
+      if (char === '{') {
+        start = index;
+        depth = 1;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+
+    if (char === '"') inString = true;
+    else if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return raw.slice(start, index + 1);
+    }
+  }
+
+  return null;
 }
 
 function parseProviderResponse(value) {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value;
-  }
+  if (isPlainObject(value)) return value;
 
   const raw = String(value || '').trim();
-
   if (!raw) {
     throw new Error('[AI Orientation] The provider returned an empty response.');
   }
@@ -261,10 +425,21 @@ function parseProviderResponse(value) {
 
   try {
     return JSON.parse(withoutFence);
-  } catch (err) {
-    throw new Error(
-      `[AI Orientation] The provider response was not valid JSON: ${err.message}`
-    );
+  } catch {
+    const extracted = extractBalancedJSONObject(raw);
+    if (!extracted) {
+      throw new Error(
+        '[AI Orientation] The provider response contained no complete JSON object.'
+      );
+    }
+
+    try {
+      return JSON.parse(extracted);
+    } catch (err) {
+      throw new Error(
+        `[AI Orientation] The candidate artifact was not valid JSON: ${err.message}`
+      );
+    }
   }
 }
 
@@ -272,6 +447,18 @@ function submitOrientationResponse(session, response, options = {}) {
   const orientation = requireOrientationSession(session);
   const onProgress =
     typeof options.onProgress === 'function' ? options.onProgress : () => {};
+
+  if (session.pendingPersistence) {
+    return {
+      ok: false,
+      retry: false,
+      complete: false,
+      state: session.state,
+      error: 'A boarding snapshot is awaiting local persistence verification.',
+      orientation: getOrientationStatus(session),
+      operation: cloneForTransport(session.pendingPersistence.operation)
+    };
+  }
 
   if (orientation.status === 'complete') {
     return {
@@ -283,23 +470,44 @@ function submitOrientationResponse(session, response, options = {}) {
     };
   }
 
-  const index = orientation.currentStageIndex;
-  const stage = orientation.stages[index];
+  const opening = !orientation.openingComplete;
+  const stage = opening
+    ? null
+    : orientation.stages[orientation.currentStageIndex];
+  const stepId = opening
+    ? session.boardingMode === BOARDING_MODES.RETURNING
+      ? 'REVIEW_OWN_ORIENTATION_NOTES'
+      : INITIAL_BOARDING_STEP
+    : stage?.id;
 
-  if (!stage) {
-    throw new Error('[AI Orientation] The current orientation stage is missing.');
+  if (!stepId) {
+    throw new Error('[AI Orientation] The current conversational step is missing.');
   }
 
-  orientation.attemptsByStage[stage.id] =
-    (orientation.attemptsByStage[stage.id] || 0) + 1;
+  orientation.attemptsByStage[stepId] =
+    (orientation.attemptsByStage[stepId] || 0) + 1;
 
-  let parsed;
+  let candidate;
 
   try {
-    parsed = parseProviderResponse(response);
+    candidate = parseProviderResponse(response);
+    acceptCandidateArtifact(session.boardingRecord, candidate, {
+      step: stepId,
+      nextStep: opening
+        ? orientation.stages[0]?.id || null
+        : orientation.stages[orientation.currentStageIndex + 1]?.id || null
+    });
   } catch (err) {
     orientation.error = err.message;
-    orientation.status = 'awaiting_stage_response';
+    orientation.status = 'awaiting_candidate_response';
+
+    rejectCandidateArtifact(session.boardingRecord, {
+      step: stepId,
+      error: err.message,
+      jsonFound: Boolean(extractBalancedJSONObject(String(response || ''))),
+      jsonValid: false,
+      requiredStructurePreserved: false
+    });
 
     return {
       ok: false,
@@ -312,81 +520,40 @@ function submitOrientationResponse(session, response, options = {}) {
     };
   }
 
-  const expectedAcknowledgement = createStageAcknowledgement(stage.id);
-  const acknowledgement = String(parsed.acknowledgement || '').trim();
-
-  if (acknowledgement !== expectedAcknowledgement) {
-    const error =
-      `[AI Orientation] Stage ${stage.id} was not validly acknowledged. ` +
-      `Expected ${expectedAcknowledgement}; received ` +
-      `${acknowledgement || '<empty>'}.`;
-
-    orientation.error = error;
-    orientation.status = 'awaiting_stage_response';
-
-    return {
-      ok: false,
-      retry: true,
-      complete: false,
-      state: session.state,
-      error,
-      orientation: getOrientationStatus(session),
-      operation: getCurrentOrientationOperation(session)
-    };
+  if (opening) {
+    orientation.openingComplete = true;
+  } else {
+    orientation.completedStageIds.push(stage.id);
+    orientation.currentStageIndex += 1;
   }
 
-  orientation.workingNotes = normalizeWorkingNotes(parsed.notes);
-  orientation.completedStageIds.push(stage.id);
-  orientation.currentStageIndex += 1;
   orientation.error = null;
+  orientation.status = 'awaiting_persistence_verification';
+  session.state = 'persisting_boarding_snapshot';
 
-  if (orientation.currentStageIndex < orientation.stageCount) {
-    orientation.status = 'awaiting_stage_response';
-    const operation = getCurrentOrientationOperation(session);
-
-    onProgress({
-      state: session.state,
-      phase: 'stage_ready',
-      completedStageId: stage.id,
-      stageId: operation.stageId,
-      stageNumber: operation.stageNumber,
-      stageCount: operation.stageCount
-    });
-
-    return {
-      ok: true,
-      retry: false,
-      complete: false,
-      state: session.state,
-      orientation: getOrientationStatus(session),
-      operation
-    };
-  }
-
-  const completedAt = Date.now();
-
-  orientation.status = 'complete';
-  orientation.completedAt = completedAt;
-  orientation.durationMs = completedAt - orientation.startedAt;
-
-  // The pipeline must activate ACTIVE_PARTITION before changing this state to
-  // ready_for_introduction. Orientation completion alone grants no capability.
-  session.state = 'orientation_complete';
+  const persistenceOperation = buildPersistenceOperation(session, stepId);
+  session.pendingPersistence = {
+    type: PERSIST_BOARDING_SNAPSHOT,
+    stepId,
+    createdAt: Date.now(),
+    operation: persistenceOperation,
+    error: null
+  };
 
   onProgress({
     state: session.state,
-    phase: 'complete',
-    durationMs: orientation.durationMs,
-    stageCount: orientation.stageCount
+    phase: 'persistence_required',
+    completedStepId: stepId,
+    nextStepId: session.boardingRecord.boarding.currentStep
   });
 
   return {
     ok: true,
     retry: false,
-    complete: true,
+    complete: false,
     state: session.state,
     orientation: getOrientationStatus(session),
-    operation: null
+    operation: cloneForTransport(persistenceOperation)
   };
 }
 
@@ -396,28 +563,44 @@ function getOrientationStatus(session) {
   return {
     protocolVersion: orientation.protocolVersion,
     status: orientation.status,
+    boardingMode: orientation.boardingMode,
     startedAt: orientation.startedAt,
     completedAt: orientation.completedAt,
     durationMs: orientation.durationMs,
     stageCount: orientation.stageCount,
     currentStageIndex: orientation.currentStageIndex,
+    openingComplete: orientation.openingComplete,
+    currentStep: session.boardingRecord?.boarding?.currentStep || null,
+    lastCompletedStep:
+      session.boardingRecord?.boarding?.lastCompletedStep || null,
     completedStageIds: [...orientation.completedStageIds],
     attemptsByStage: { ...orientation.attemptsByStage },
-    workingNotes: cloneForTransport(orientation.workingNotes),
+    pendingPersistenceType: session.pendingPersistence?.type || null,
+    candidateSummary: {
+      questions: session.boardingRecord?.candidate?.questions?.length || 0,
+      ambiguities: session.boardingRecord?.candidate?.ambiguities?.length || 0,
+      possibleConflicts:
+        session.boardingRecord?.candidate?.possibleConflicts?.length || 0,
+      progressEntries:
+        session.boardingRecord?.candidate?.orientationProgress?.length || 0
+    },
     error: orientation.error
   };
 }
 
 module.exports = {
-  ORIENTATION_FILES,
+  CURRICULUM_DIRECTORY,
+  CURRICULUM_MANIFEST_FILE,
   ORIENTATION_PROTOCOL_VERSION,
-  STAGE_ACKNOWLEDGEMENT_PREFIX,
+  PERSIST_BOARDING_SNAPSHOT,
   loadOrientationStages,
   validateOrientationChain,
-  createStageAcknowledgement,
+  buildOpeningOperation,
   buildStageOperation,
+  buildPersistenceOperation,
   beginOrientation,
   getCurrentOrientationOperation,
+  parseProviderResponse,
   submitOrientationResponse,
   getOrientationStatus
 };
