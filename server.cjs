@@ -365,8 +365,7 @@
   console.log("[WM-AI] app.locals.ai populated");
 
   // ─── BlackBox stack ─────────────────────────────────────────────────────────
-  let bbRuntime, bbAutonomy, bbThinking, bbRelationship, bbUI, bbGateway;
-
+  let bbRuntime, bbAutonomy, bbRelationship, bbUI, bbGateway;
   console.log("[WM-BB] Loading BlackBox Runtime…");
   try {
     bbRuntime = require(r('BlackBox/blackbox.runtime.cjs'));
@@ -398,20 +397,6 @@
   } catch (e) {
     logger.warn('BlackBox Autonomy unavailable', { err: e.message });
     console.log("[WM-BB] BlackBox Autonomy unavailable:", e.message);
-  }
-
-  console.log("[WM-BB] Loading BlackBox Thinking…");
-  try {
-    bbThinking = require(r('BlackBox/blackbox.thinking.cjs'));
-    if (typeof bbThinking.init === 'function') {
-      const result = bbThinking.init({ bbRuntime, logger });
-      if (result instanceof Promise) await result;
-    }
-    logger.info('BlackBox Thinking initialised');
-    console.log("[WM-BB] BlackBox Thinking initialised");
-  } catch (e) {
-    logger.warn('BlackBox Thinking unavailable', { err: e.message });
-    console.log("[WM-BB] BlackBox Thinking unavailable:", e.message);
   }
 
   console.log("[WM-BB] Loading BlackBox Relationship…");
@@ -449,7 +434,6 @@
       const result = bbGateway.init({
         bbRuntime,
         bbAutonomy,
-        bbThinking,
         bbRelationship,
         eventBus,
         logger
@@ -466,7 +450,6 @@
   app.locals.blackbox = {
     runtime: bbRuntime,
     autonomy: bbAutonomy,
-    thinking: bbThinking,
     relationship: bbRelationship,
     ui: bbUI,
     gateway: bbGateway,
