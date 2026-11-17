@@ -685,72 +685,20 @@
     logger.warn('Providers API unavailable', { err: e.message });
     console.log("[WM-API] Providers API unavailable:", e.message);
   }
-
-  // ─── AI routes ──────────────────────────────────────────────────────────────
-  console.log("[WM-CHAT] Registering /api/ai/chat route…");
-  app.post('/api/ai/chat', async (req, res) => {
-    console.log("[WM-CHAT] /api/ai/chat invoked");
+     // ─── AI routes ──────────────────────────────────────────────────────────────
+     
+     //  Transport-neutral, backend-authoritative AI session API
+    console.log("[WM-AI] Mounting governed AI session routes...");
     try {
-      const { messages } = req.body;
-      console.log("[WM-CHAT] Incoming messages payload:", messages);
+      const aiSessionRoutes = require(r('api/ai.session.routes.cjs'));
+      app.use('/api/ai', aiSessionRoutes);
 
-      logger.info("[Frontend Message] Received:", {
-        text: messages?.[messages.length - 1]?.content
-      });
-
-      const runtime = app.locals.ai?.runtime;
-      if (!runtime) {
-        console.log("[WM-CHAT] ERROR — AI runtime not available");
-        return res.json({ ok: false, error: "AI runtime not available" });
-      }
-
-      if (typeof runtime.chat !== "function") {
-        console.log("[WM-CHAT] ERROR — runtime.chat() not implemented");
-        return res.json({ ok: false, error: "AI runtime does not implement chat()" });
-      }
-
-      console.log("[WM-CHAT] Calling runtime.chat()…");
-      const reply = await runtime.chat(messages);
-      console.log("[WM-CHAT] runtime.chat() returned:", reply);
-
-      logger.info("[AI Reply]", { reply });
-
-      return res.json({ ok: true, reply });
-    } catch (err) {
-      console.log("[WM-CHAT] ERROR — runtime.chat() threw:", err);
-      logger.error("[AI-Chat] Error during chat", { err: err.message });
-      return res.json({ ok: false, error: err.message });
+      logger.info('Governed AI session routes mounted');
+      console.log("[WM-AI] Governed AI session routes mounted at /api/ai");
+    } catch (e) {
+      logger.error('Governed AI session routes unavailable', { err: e.message });
+      console.log("[WM-AI] Governed AI session routes FAILED:", e.message);
     }
-  });
-
-  // AI onboarding
-  console.log("[WM-INVITE] Registering /api/ai/invite route…");
-  app.post('/api/ai/invite', async (req, res) => {
-    console.log("[WM-INVITE] /api/ai/invite invoked");
-    try {
-      const aiStartup = app.locals.aiStartup;
-      if (!aiStartup || typeof aiStartup.startAIOnboarding !== 'function') {
-        console.log("[WM-INVITE] ERROR — AI onboarding not available");
-        return res.json({ ok: false, error: "AI onboarding not available" });
-      }
-
-      const systemSettings = app.locals.systemSettings || {};
-      const partitionPaths = app.locals.partition?.paths || null;
-
-      console.log("[WM-INVITE] Calling startAIOnboarding…");
-      const result = await aiStartup.startAIOnboarding({
-        systemSettings,
-        partitionPaths
-      });
-      console.log("[WM-INVITE] startAIOnboarding returned:", result);
-
-      res.json({ ok: true, result });
-    } catch (err) {
-      console.log("[WM-INVITE] ERROR — onboarding threw:", err);
-      logger.error('[AI-Invite] Error during onboarding', { err: err.message });
-      res.json({ ok: false, error: err.message });
-    }
-  });
 
   // Rooms → Partition migration route
   console.log("[WM-ROOMS] Registering /api/rooms/migrate route…");
