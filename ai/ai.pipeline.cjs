@@ -2,35 +2,39 @@
    WingMan Backend File
 
    Alias: @backend-ai/ai.pipeline.cjs
-   Role: Authoritative backend AI session pipeline.
+   Role: Authoritative, transport-neutral backend AI session pipeline.
 
    Responsibilities:
-     - Create and retain provider sessions.
-     - Deliver required governed WingMan orientation.
+     - Create and retain backend-owned candidate AI sessions.
+     - Deliver governed orientation one stage at a time.
+     - Accept provider responses transported by Electron.
      - Activate ACTIVE_PARTITION only after orientation succeeds.
-     - Maintain backend-owned conversation history.
-     - Stream provider replies.
+     - Prepare governed chat operations for Electron to transport.
+     - Record completed provider replies in backend-owned continuity.
      - Close sessions and revoke ACTIVE_PARTITION access.
 
-   Explicitly not responsible for:
-     - Reading private Partition notes or scratch material.
-     - Reading First-AI User Interview answers.
-     - Rebuilding identity from legacy carepackage systems.
-     - Exposing host filesystem paths.
-     - Direct filesystem placement into legacy user/shared roots.
-     - Frontend vision, STT, or TTS implementation.
+   Authority contract:
+     - Electron owns provider credentials and provider transport.
+     - This module never receives an API key or creates a provider client.
+     - The backend alone advances admission state and grants capabilities.
 ========================================================================= */
 
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { runAIOrientation } = require('./orientation/ai.orientation.cjs');
+const {
+  beginOrientation,
+  getCurrentOrientationOperation,
+  submitOrientationResponse,
+  getOrientationStatus
+} = require('./orientation/ai.orientation.cjs');
 const ActivePartitionGateway = require('../partition/api/active-partition.gateway.cjs');
 
 const sessions = new Map();
 
 function normalizeProvider(provider) {
-  return String(provider || 'openai').trim().toLowerCase();
+  const value = String(provider || '').trim().toLowerCase();
+  return value || 'openai';
 }
 
 function defaultModel(provider) {
@@ -39,49 +43,72 @@ function defaultModel(provider) {
       return 'llama-3.3-70b-versatile';
     case 'anthropic':
       return 'claude-3-5-sonnet-20241022';
+    case 'gemini':
+      return 'gemini-2.0-flash';
+    case 'deepseek':
+      return 'deepseek-chat';
+    case 'lmstudio':
+    case 'ollama':
+      return null;
     default:
       return 'gpt-4o';
   }
 }
 
-async function createClient(provider, apiKey, baseUrl, orgId, projectId) {
-  const normalizedProvider = normalizeProvider(provider);
+function normalizeSessionId(sessionId) {
+  return typeof sessionId === 'string' ? sessionId.trim() : '';
+}
 
-  if (normalizedProvider === 'openai' || normalizedProvider === 'groq') {
-    let OpenAI;
-    try {
-      OpenAI = require('openai');
-    } catch {
-      throw new Error('openai package not found. Run: npm install openai');
-    }
+function getRequiredSession(sessionId) {
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  const session = sessions.get(normalizedSessionId);
 
-    const baseUrls = {
-      openai: 'https://api.openai.com/v1',
-      groq: 'https://api.groq.com/openai/v1'
+  if (!session) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      error: `Session not found: ${normalizedSessionId}`
     };
-
-    return new OpenAI({
-      apiKey,
-      organization: orgId || undefined,
-      project: projectId || undefined,
-      baseURL: baseUrl || baseUrls[normalizedProvider]
-    });
   }
 
-  if (normalizedProvider === 'anthropic') {
-    let Anthropic;
-    try {
-      Anthropic = require('@anthropic-ai/sdk');
-    } catch {
-      throw new Error('Anthropic SDK not found. Run: npm install @anthropic-ai/sdk');
-    }
+  return { ok: true, sessionId: normalizedSessionId, session };
+}
 
-    return new Anthropic({ apiKey });
-  }
+function clone(value) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value));
+}
 
-  throw new Error(
-    `Unknown provider: "${provider}". Supported: openai, groq, anthropic`
-  );
+function publicOrientation(session) {
+  if (!session.orientation) return null;
+  return getOrientationStatus(session);
+}
+
+function publicSession(session) {
+  return {
+    id: session.id,
+    provider: session.provider,
+    model: session.model,
+    params: clone(session.params),
+    state: session.state,
+    orientation: publicOrientation(session),
+    activePartition: session.activePartition
+      ? {
+          ...session.activePartition,
+          operations: [...session.activePartition.operations]
+        }
+      : null,
+    pendingTurn: session.pendingTurn
+      ? {
+          id: session.pendingTurn.id,
+          type: session.pendingTurn.type,
+          createdAt: session.pendingTurn.createdAt
+        }
+      : null,
+    startedAt: session.startedAt,
+    configVersion: session.configVersion,
+    log: session.log.map(entry => ({ ...entry }))
+  };
 }
 
 function buildOperationalSystemMessage(session) {
@@ -106,216 +133,160 @@ function buildConversationMessages(session, userMessage) {
   ];
 }
 
-async function connect(config = {}) {
+function activatePartition(session) {
+  session.state = 'activating_partition';
+
+  const partitionAccess = ActivePartitionGateway.activate({
+    sessionId: session.id
+  });
+
+  if (!partitionAccess || partitionAccess.ok !== true) {
+    session.state = 'partition_access_failed';
+    throw new Error(
+      `ACTIVE_PARTITION activation failed: ${
+        partitionAccess?.error || 'unknown error'
+      }`
+    );
+  }
+
+  session.activePartition = {
+    capability: partitionAccess.capability,
+    state: partitionAccess.state,
+    operations: Array.isArray(partitionAccess.operations)
+      ? [...partitionAccess.operations]
+      : []
+  };
+
+  session.state = 'ready_for_introduction';
+  console.log(`[ai.pipeline] ACTIVE_PARTITION activated: ${session.id}`);
+
+  return session.activePartition;
+}
+
+/* ------------------------------------------------------------------------
+   CONNECT
+
+   Creates a backend-owned candidate session and returns the first governed
+   orientation operation. It does not connect to a provider.
+------------------------------------------------------------------------ */
+function connect(config = {}) {
   const {
     provider = 'openai',
-    apiKey,
     model,
-    baseUrl,
-    params = {},
-    orgId,
-    projectId
+    params = {}
   } = config;
-
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
-    return { ok: false, error: 'apiKey is required' };
-  }
 
   const normalizedProvider = normalizeProvider(provider);
   const resolvedModel = model || defaultModel(normalizedProvider);
   const sessionId = randomUUID();
 
+  const session = {
+    id: sessionId,
+    provider: normalizedProvider,
+    model: resolvedModel,
+    params: params && typeof params === 'object' && !Array.isArray(params)
+      ? clone(params)
+      : {},
+    log: [],
+    state: 'admission_pending',
+    orientation: null,
+    activePartition: null,
+    pendingTurn: null,
+    startedAt: Date.now(),
+    configVersion: '3.0.0'
+  };
+
   try {
-    const client = await createClient(
-      normalizedProvider,
-      apiKey,
-      baseUrl,
-      orgId,
-      projectId
-    );
-
-    const session = {
-      id: sessionId,
-      provider: normalizedProvider,
-      model: resolvedModel,
-      client,
-      params: params && typeof params === 'object' ? params : {},
-      log: [],
-      state: 'orienting',
-      orientation: null,
-      activePartition: null,
-      startedAt: Date.now(),
-      configVersion: '2.0.0',
-      orgId: orgId || null,
-      projectId: projectId || null
-    };
-
     sessions.set(sessionId, session);
 
     console.log(
-      `[ai.pipeline] Session created: ${sessionId} (${normalizedProvider}/${resolvedModel})`
+      `[ai.pipeline] Candidate session created: ${sessionId} ` +
+      `(${normalizedProvider}/${resolvedModel || 'local-default'})`
     );
-    console.log(`[ai.pipeline] AI orientation starting: ${sessionId}`);
 
-    const orientation = await runAIOrientation(session, {
+    const orientation = beginOrientation(session, {
       onProgress(progress) {
         console.log('[ai.pipeline] Orientation progress:', progress);
       }
     });
 
-    session.orientation = orientation;
-    console.log(`[ai.pipeline] AI orientation complete: ${sessionId}`);
+    return {
+      ok: true,
+      active: false,
+      admitted: false,
+      sessionId,
+      provider: session.provider,
+      model: session.model,
+      state: session.state,
+      orientation: orientation.orientation,
+      operation: orientation.operation
+    };
+  } catch (err) {
+    sessions.delete(sessionId);
+    console.error('[ai.pipeline] connect error:', err.message);
+    return { ok: false, sessionId, error: err.message };
+  }
+}
 
-    session.state = 'activating_partition';
-    const partitionAccess = ActivePartitionGateway.activate({ sessionId });
+/* ------------------------------------------------------------------------
+   ORIENTATION RESPONSE
 
-    if (!partitionAccess || partitionAccess.ok !== true) {
-      session.state = 'partition_access_failed';
-      throw new Error(
-        `ACTIVE_PARTITION activation failed: ${
-          partitionAccess?.error || 'unknown error'
-        }`
-      );
+   Accepts one provider response transported by Electron. When the final
+   stage is validly acknowledged, the backend activates ACTIVE_PARTITION and
+   alone declares ready_for_introduction.
+------------------------------------------------------------------------ */
+function advanceOrientation({ sessionId, response } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+
+  const { session, sessionId: normalizedSessionId } = lookup;
+
+  if (session.state !== 'orienting' && session.state !== 'orientation_complete') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: `Session is not accepting orientation responses: ${session.state}`
+    };
+  }
+
+  try {
+    const result = submitOrientationResponse(session, response, {
+      onProgress(progress) {
+        console.log('[ai.pipeline] Orientation progress:', progress);
+      }
+    });
+
+    if (!result.ok || !result.complete) {
+      return {
+        ...result,
+        sessionId: normalizedSessionId,
+        provider: session.provider,
+        model: session.model,
+        admitted: false
+      };
     }
 
-    session.activePartition = {
-      capability: partitionAccess.capability,
-      state: partitionAccess.state,
-      operations: Array.isArray(partitionAccess.operations)
-        ? [...partitionAccess.operations]
-        : []
-    };
-    session.state = 'ready_for_introduction';
-
-    console.log(`[ai.pipeline] ACTIVE_PARTITION activated: ${sessionId}`);
+    const activePartition = activatePartition(session);
 
     return {
       ok: true,
       active: true,
-      sessionId,
-      provider: normalizedProvider,
-      model: resolvedModel,
-      state: session.state,
-      orientation: session.orientation,
-      activePartition: { ...session.activePartition }
-    };
-  } catch (err) {
-    console.error('[ai.pipeline] connect error:', err.message);
-
-    try {
-      if (typeof ActivePartitionGateway.deactivate === 'function') {
-        ActivePartitionGateway.deactivate({ sessionId });
-      }
-    } catch (cleanupError) {
-      console.error(
-        '[ai.pipeline] connect cleanup failed:',
-        cleanupError.message
-      );
-    }
-
-    sessions.delete(sessionId);
-    return { ok: false, error: err.message };
-  }
-}
-
-async function chat({ sessionId, message, onChunk } = {}) {
-  const normalizedSessionId =
-    typeof sessionId === 'string' ? sessionId.trim() : '';
-  const userMessage = typeof message === 'string' ? message.trim() : '';
-  const session = sessions.get(normalizedSessionId);
-
-  if (!session) {
-    return { ok: false, error: `Session not found: ${normalizedSessionId}` };
-  }
-
-  if (!userMessage) {
-    return { ok: false, error: 'A non-empty user message is required.' };
-  }
-
-  if (
-    session.state !== 'ready' &&
-    session.state !== 'ready_for_introduction'
-  ) {
-    return {
-      ok: false,
-      error: 'The AI has not completed WingMan orientation.',
-      state: session.state
-    };
-  }
-
-  session.state = 'thinking';
-  const startedAt = Date.now();
-
-  try {
-    const messages = buildConversationMessages(session, userMessage);
-    let fullReply = '';
-
-    if (session.provider === 'openai' || session.provider === 'groq') {
-      const stream = await session.client.chat.completions.create({
-        model: session.model,
-        messages,
-        stream: true,
-        ...session.params
-      });
-
-      for await (const chunk of stream) {
-        const segment = chunk.choices?.[0]?.delta?.content || '';
-        if (!segment) continue;
-        fullReply += segment;
-        if (typeof onChunk === 'function') onChunk(segment);
-      }
-    } else if (session.provider === 'anthropic') {
-      const systemMessage = messages.find(item => item.role === 'system');
-      const conversation = messages.filter(item => item.role !== 'system');
-      const maxTokens = session.params.maxOutput || session.params.max_tokens || 2048;
-
-      const anthropicParams = { ...session.params };
-      delete anthropicParams.maxOutput;
-      delete anthropicParams.max_tokens;
-
-      const stream = session.client.messages.stream({
-        model: session.model,
-        max_tokens: maxTokens,
-        ...(systemMessage ? { system: systemMessage.content } : {}),
-        messages: conversation,
-        ...anthropicParams
-      });
-
-      for await (const event of stream) {
-        const segment = event.delta?.text || '';
-        if (!segment) continue;
-        fullReply += segment;
-        if (typeof onChunk === 'function') onChunk(segment);
-      }
-    } else {
-      throw new Error(`No chat implementation for provider: ${session.provider}`);
-    }
-
-    const completedAt = Date.now();
-    const latencyMs = completedAt - startedAt;
-
-    session.log.push(
-      { role: 'user', content: userMessage, ts: startedAt },
-      { role: 'assistant', content: fullReply, ts: completedAt }
-    );
-    session.state = 'ready';
-
-    console.log(
-      `[ai.pipeline] chat done: ${normalizedSessionId} (${latencyMs}ms)`
-    );
-
-    return {
-      ok: true,
+      admitted: true,
+      complete: true,
       sessionId: normalizedSessionId,
       provider: session.provider,
+      model: session.model,
       state: session.state,
-      fullReply,
-      reply: fullReply,
-      latencyMs
+      orientation: publicOrientation(session),
+      activePartition: {
+        ...activePartition,
+        operations: [...activePartition.operations]
+      },
+      operation: null
     };
   } catch (err) {
-    session.state = 'ready';
-    console.error('[ai.pipeline] chat error:', err.message);
+    console.error('[ai.pipeline] orientation response error:', err.message);
     return {
       ok: false,
       sessionId: normalizedSessionId,
@@ -325,15 +296,206 @@ async function chat({ sessionId, message, onChunk } = {}) {
   }
 }
 
-function disconnect({ sessionId } = {}) {
-  const normalizedSessionId =
-    typeof sessionId === 'string' ? sessionId.trim() : '';
-  const session = sessions.get(normalizedSessionId);
+function currentOperation({ sessionId } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
 
-  if (!session) {
-    return { ok: false, error: `Session not found: ${normalizedSessionId}` };
+  const { session, sessionId: normalizedSessionId } = lookup;
+
+  if (session.state === 'orienting') {
+    return {
+      ok: true,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      operation: getCurrentOrientationOperation(session)
+    };
   }
 
+  if (session.pendingTurn) {
+    return {
+      ok: true,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      operation: clone(session.pendingTurn.operation)
+    };
+  }
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    state: session.state,
+    operation: null
+  };
+}
+
+/* ------------------------------------------------------------------------
+   CHAT
+
+   Chat is two-step because Electron owns provider transport:
+     1. beginChat() returns a governed provider operation.
+     2. completeChat() records the provider reply and restores ready state.
+------------------------------------------------------------------------ */
+function beginChat({ sessionId, message } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+
+  const { session, sessionId: normalizedSessionId } = lookup;
+  const userMessage = typeof message === 'string' ? message.trim() : '';
+
+  if (!userMessage) {
+    return { ok: false, error: 'A non-empty user message is required.' };
+  }
+
+  if (session.state !== 'ready' && session.state !== 'ready_for_introduction') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The AI has not been admitted to WingMan.'
+    };
+  }
+
+  if (session.pendingTurn) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'A provider turn is already pending.'
+    };
+  }
+
+  const turnId = randomUUID();
+  const startedAt = Date.now();
+  const operation = {
+    type: 'chat_turn',
+    turnId,
+    sessionId: normalizedSessionId,
+    provider: session.provider,
+    model: session.model,
+    params: clone(session.params),
+    messages: buildConversationMessages(session, userMessage)
+  };
+
+  session.pendingTurn = {
+    id: turnId,
+    type: 'chat_turn',
+    userMessage,
+    createdAt: startedAt,
+    operation
+  };
+  session.state = 'awaiting_provider_response';
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    state: session.state,
+    operation: clone(operation)
+  };
+}
+
+function completeChat({ sessionId, turnId, reply } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+
+  const { session, sessionId: normalizedSessionId } = lookup;
+  const pending = session.pendingTurn;
+  const normalizedTurnId = typeof turnId === 'string' ? turnId.trim() : '';
+  const fullReply = typeof reply === 'string' ? reply.trim() : '';
+
+  if (!pending || pending.type !== 'chat_turn') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No chat turn is awaiting a provider response.'
+    };
+  }
+
+  if (!normalizedTurnId || normalizedTurnId !== pending.id) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The provider response does not match the pending chat turn.'
+    };
+  }
+
+  if (!fullReply) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'A non-empty provider reply is required.'
+    };
+  }
+
+  const completedAt = Date.now();
+  const latencyMs = completedAt - pending.createdAt;
+
+  session.log.push(
+    { role: 'user', content: pending.userMessage, ts: pending.createdAt },
+    { role: 'assistant', content: fullReply, ts: completedAt }
+  );
+  session.pendingTurn = null;
+  session.state = 'ready';
+
+  console.log(
+    `[ai.pipeline] chat completed: ${normalizedSessionId} (${latencyMs}ms)`
+  );
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    provider: session.provider,
+    state: session.state,
+    fullReply,
+    reply: fullReply,
+    latencyMs
+  };
+}
+
+function failPendingTurn({ sessionId, turnId, error } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+
+  const { session, sessionId: normalizedSessionId } = lookup;
+  const pending = session.pendingTurn;
+  const normalizedTurnId = typeof turnId === 'string' ? turnId.trim() : '';
+
+  if (!pending) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No provider turn is pending.'
+    };
+  }
+
+  if (normalizedTurnId && normalizedTurnId !== pending.id) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The failure does not match the pending provider turn.'
+    };
+  }
+
+  session.pendingTurn = null;
+  session.state = session.activePartition ? 'ready' : 'orienting';
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    state: session.state,
+    providerError: String(error || 'Provider transport failed.')
+  };
+}
+
+function disconnect({ sessionId } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+
+  const { session, sessionId: normalizedSessionId } = lookup;
   session.state = 'disconnecting';
 
   let partitionResult = null;
@@ -356,31 +518,18 @@ function disconnect({ sessionId } = {}) {
 }
 
 function getSession(sessionId) {
-  const normalizedSessionId =
-    typeof sessionId === 'string' ? sessionId.trim() : '';
-  const session = sessions.get(normalizedSessionId);
-
-  if (!session) return null;
-
-  const { client, ...safeSession } = session;
-  return {
-    ...safeSession,
-    log: session.log.map(entry => ({ ...entry })),
-    orientation: session.orientation
-      ? { ...session.orientation }
-      : null,
-    activePartition: session.activePartition
-      ? {
-          ...session.activePartition,
-          operations: [...session.activePartition.operations]
-        }
-      : null
-  };
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return null;
+  return publicSession(lookup.session);
 }
 
 module.exports = {
   connect,
-  chat,
+  advanceOrientation,
+  currentOperation,
+  beginChat,
+  completeChat,
+  failPendingTurn,
   disconnect,
   getSession
 };
