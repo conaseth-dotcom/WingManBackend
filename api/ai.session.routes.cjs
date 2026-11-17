@@ -3,7 +3,8 @@
 
    Alias: @backend-api/ai.session.routes.cjs
    Role: HTTP interface for backend-authoritative, transport-neutral AI
-         admission, orientation, chat, status, and disconnect operations.
+         admission, orientation, persistence verification, chat, status,
+         and disconnect operations.
 ========================================================================= */
 
 'use strict';
@@ -19,7 +20,6 @@ function sendResult(res, result, successStatus = 200) {
       result || { ok: false, error: 'The AI operation returned no result.' }
     );
   }
-
   return res.status(successStatus).json(result);
 }
 
@@ -28,7 +28,6 @@ router.post('/invite', async (req, res) => {
 
   try {
     const aiStartup = req.app.locals.aiStartup;
-
     if (!aiStartup || typeof aiStartup.startAIOnboarding !== 'function') {
       return res.status(503).json({
         ok: false,
@@ -39,13 +38,15 @@ router.post('/invite', async (req, res) => {
     const {
       provider = 'openai',
       model,
-      params = {}
+      params = {},
+      localBoardingContext
     } = req.body || {};
 
     const result = await aiStartup.startAIOnboarding({
       provider,
       model,
       params,
+      localBoardingContext,
       systemSettings: req.app.locals.systemSettings || {},
       partitionPaths: req.app.locals.partition?.paths || null
     });
@@ -70,6 +71,23 @@ router.post('/orientation/respond', (req, res) => {
   }
 });
 
+router.post('/orientation/persistence-result', (req, res) => {
+  console.log('[WM-ORIENTATION] POST /api/ai/orientation/persistence-result');
+
+  try {
+    const { sessionId, persistenceType, result } = req.body || {};
+    const response = AIEngine.submitPersistenceResult({
+      sessionId,
+      persistenceType,
+      result
+    });
+    return sendResult(res, response);
+  } catch (err) {
+    console.error('[WM-ORIENTATION] Persistence result failed:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 router.get('/session/:sessionId/operation', (req, res) => {
   try {
     const result = AIEngine.currentOperation({
@@ -84,9 +102,7 @@ router.get('/session/:sessionId/operation', (req, res) => {
 
 router.get('/session/:sessionId/status', (req, res) => {
   try {
-    const result = AIEngine.status({
-      sessionId: req.params.sessionId
-    });
+    const result = AIEngine.status({ sessionId: req.params.sessionId });
     return sendResult(res, result);
   } catch (err) {
     console.error('[WM-AI] Status lookup failed:', err);
@@ -96,11 +112,9 @@ router.get('/session/:sessionId/status', (req, res) => {
 
 router.post('/chat/begin', (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/begin');
-
   try {
     const { sessionId, message } = req.body || {};
-    const result = AIEngine.beginChat({ sessionId, message });
-    return sendResult(res, result);
+    return sendResult(res, AIEngine.beginChat({ sessionId, message }));
   } catch (err) {
     console.error('[WM-CHAT] Chat preparation failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -109,11 +123,9 @@ router.post('/chat/begin', (req, res) => {
 
 router.post('/chat/complete', (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/complete');
-
   try {
     const { sessionId, turnId, reply } = req.body || {};
-    const result = AIEngine.completeChat({ sessionId, turnId, reply });
-    return sendResult(res, result);
+    return sendResult(res, AIEngine.completeChat({ sessionId, turnId, reply }));
   } catch (err) {
     console.error('[WM-CHAT] Chat completion failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -122,11 +134,9 @@ router.post('/chat/complete', (req, res) => {
 
 router.post('/turn/fail', (req, res) => {
   console.log('[WM-AI] POST /api/ai/turn/fail');
-
   try {
     const { sessionId, turnId, error } = req.body || {};
-    const result = AIEngine.failPendingTurn({ sessionId, turnId, error });
-    return sendResult(res, result);
+    return sendResult(res, AIEngine.failPendingTurn({ sessionId, turnId, error }));
   } catch (err) {
     console.error('[WM-AI] Pending-turn failure handling failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -135,11 +145,9 @@ router.post('/turn/fail', (req, res) => {
 
 router.post('/disconnect', (req, res) => {
   console.log('[WM-AI] POST /api/ai/disconnect');
-
   try {
     const { sessionId } = req.body || {};
-    const result = AIEngine.disconnect({ sessionId });
-    return sendResult(res, result);
+    return sendResult(res, AIEngine.disconnect({ sessionId }));
   } catch (err) {
     console.error('[WM-AI] Disconnect failed:', err);
     return res.status(500).json({ ok: false, error: err.message });

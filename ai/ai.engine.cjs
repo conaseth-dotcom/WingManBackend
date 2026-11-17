@@ -3,14 +3,6 @@
 
    Alias: @backend-ai/ai.engine.cjs
    Role: Authoritative persistent-session facade for the WingMan AI pipeline.
-
-   Authority:
-     - The backend creates and owns AI sessions.
-     - The backend owns governed orientation state and progression.
-     - The backend activates and deactivates session capabilities.
-     - Electron owns provider credentials and provider transport.
-     - The frontend may request and transport operations, but may not admit
-       the AI or grant capabilities.
 ========================================================================= */
 
 'use strict';
@@ -22,31 +14,24 @@ function requireSessionId(sessionId) {
     typeof sessionId === 'string' ? sessionId.trim() : '';
 
   if (!normalizedSessionId) {
-    return {
-      ok: false,
-      error: 'A valid AI sessionId is required.'
-    };
+    return { ok: false, error: 'A valid AI sessionId is required.' };
   }
 
-  return {
-    ok: true,
-    sessionId: normalizedSessionId
-  };
+  return { ok: true, sessionId: normalizedSessionId };
 }
 
-/* ------------------------------------------------------------------------
-   CONNECT
-
-   Creates one backend-owned candidate session and returns the first governed
-   orientation operation for Electron to transport to the local provider.
-   No provider credentials enter the backend.
------------------------------------------------------------------------- */
-function connect({ provider = 'openai', model, params = {} } = {}) {
+function connect({
+  provider = 'openai',
+  model,
+  params = {},
+  localBoardingContext
+} = {}) {
   try {
     const result = AIPipeline.connect({
       provider,
       model,
-      params
+      params,
+      localBoardingContext
     });
 
     if (!result || result.ok !== true) {
@@ -63,14 +48,10 @@ function connect({ provider = 'openai', model, params = {} } = {}) {
   }
 }
 
-/* ------------------------------------------------------------------------
-   ORIENTATION
------------------------------------------------------------------------- */
 function advanceOrientation({ sessionId, response } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-
     return AIPipeline.advanceOrientation({
       sessionId: validated.sessionId,
       response
@@ -81,36 +62,44 @@ function advanceOrientation({ sessionId, response } = {}) {
   }
 }
 
-function currentOperation({ sessionId } = {}) {
+function submitPersistenceResult({
+  sessionId,
+  persistenceType,
+  result
+} = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
 
-    return AIPipeline.currentOperation({
-      sessionId: validated.sessionId
+    return AIPipeline.submitPersistenceResult({
+      sessionId: validated.sessionId,
+      persistenceType,
+      result
     });
+  } catch (err) {
+    console.error('[AIEngine] submitPersistenceResult failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+function currentOperation({ sessionId } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+    return AIPipeline.currentOperation({ sessionId: validated.sessionId });
   } catch (err) {
     console.error('[AIEngine] currentOperation failed:', err);
     return { ok: false, error: err.message };
   }
 }
 
-/* ------------------------------------------------------------------------
-   CHAT
-
-   Chat is deliberately split around Electron-owned provider transport.
-   beginChat() prepares the governed operation. completeChat() records the
-   returned provider reply in backend-owned continuity.
------------------------------------------------------------------------- */
 function beginChat({ sessionId, message } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-
     if (typeof message !== 'string' || !message.trim()) {
       return { ok: false, error: 'A non-empty user message is required.' };
     }
-
     return AIPipeline.beginChat({
       sessionId: validated.sessionId,
       message: message.trim()
@@ -125,7 +114,6 @@ function completeChat({ sessionId, turnId, reply } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-
     return AIPipeline.completeChat({
       sessionId: validated.sessionId,
       turnId,
@@ -141,7 +129,6 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-
     return AIPipeline.failPendingTurn({
       sessionId: validated.sessionId,
       turnId,
@@ -153,14 +140,10 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
   }
 }
 
-/* ------------------------------------------------------------------------
-   STATUS
------------------------------------------------------------------------- */
 function status({ sessionId } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-
     const session = AIPipeline.getSession(validated.sessionId);
 
     if (!session) {
@@ -186,6 +169,8 @@ function status({ sessionId } = {}) {
       provider: session.provider,
       model: session.model,
       state: session.state,
+      boardingMode: session.boardingMode,
+      partitionId: session.partitionId,
       orientation: session.orientation,
       activePartition: session.activePartition || null,
       pendingTurn: session.pendingTurn || null,
@@ -197,20 +182,11 @@ function status({ sessionId } = {}) {
   }
 }
 
-/* ------------------------------------------------------------------------
-   DISCONNECT
-
-   Closes the exact backend-owned session. AIPipeline.disconnect() also
-   removes that session's ACTIVE_PARTITION authorization.
------------------------------------------------------------------------- */
 function disconnect({ sessionId } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-
-    return AIPipeline.disconnect({
-      sessionId: validated.sessionId
-    });
+    return AIPipeline.disconnect({ sessionId: validated.sessionId });
   } catch (err) {
     console.error('[AIEngine] disconnect failed:', err);
     return { ok: false, error: err.message };
@@ -220,6 +196,7 @@ function disconnect({ sessionId } = {}) {
 module.exports = {
   connect,
   advanceOrientation,
+  submitPersistenceResult,
   currentOperation,
   beginChat,
   completeChat,

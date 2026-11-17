@@ -6,6 +6,8 @@
 
    Authority contract:
      - Electron owns provider credentials and provider transport.
+     - Electron may supply local boarding facts from the active Partition.
+     - The backend validates those facts and selects boarding mode.
      - The backend owns candidate-session creation, orientation progression,
        capability activation, and Participant Ready state.
      - Startup initializes backend support systems, then opens a governed
@@ -16,9 +18,6 @@
 
 console.log('>>> [WM-FILE-LOAD] ai.startup.cjs loaded');
 
-// ---------------------------------------------------------------------------
-// CommonJS imports (defensive, MVP-friendly)
-// ---------------------------------------------------------------------------
 let logger;
 try {
   logger = require('./lib/logger.cjs');
@@ -57,9 +56,6 @@ try {
   RelationshipBootstrap = null;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 async function safeCall(label, fn, ...args) {
   if (typeof fn !== 'function') {
     logger.warn(`[AI-Startup] ${label} unavailable (no function export)`);
@@ -94,13 +90,11 @@ function summarizePhases(phases) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main AI admission entry point
-// ---------------------------------------------------------------------------
 async function startAIOnboarding({
   provider = 'openai',
   model,
   params = {},
+  localBoardingContext,
   systemSettings = {},
   partitionPaths = null
 } = {}) {
@@ -108,15 +102,12 @@ async function startAIOnboarding({
 
   const phases = {};
 
-  // Retained only as an explicit statement that legacy carepackage loading is
-  // not part of admission. Private Partition notes are not inspected here.
   const carepackage = null;
   phases.carepackage = {
     ok: true,
     available: false
   };
 
-  // Boot relationship support when available.
   if (RelationshipBootstrap) {
     phases.relationship = await safeCall(
       'RelationshipBootstrap.initializeWingManRuntime',
@@ -135,7 +126,6 @@ async function startAIOnboarding({
     phases.relationship = { ok: false, available: false };
   }
 
-  // Initialize personality support when available.
   if (PersonalityEngine) {
     phases.personality = await safeCall(
       'PersonalityEngine.initializePersonality',
@@ -148,8 +138,6 @@ async function startAIOnboarding({
     phases.personality = { ok: false, available: false };
   }
 
-  // Initialize the governed gateway when available. partitionPaths remains an
-  // internal backend input and is never returned to Electron.
   if (BlackBoxRuntime) {
     phases.blackbox = await safeCall(
       'BlackBoxRuntime.initialize',
@@ -163,12 +151,11 @@ async function startAIOnboarding({
     phases.blackbox = { ok: false, available: false };
   }
 
-  // Create the backend-owned candidate session. This returns the first
-  // canonical orientation operation for Electron to transport locally.
   const admission = AIEngine.connect({
     provider,
     model,
-    params
+    params,
+    localBoardingContext
   });
 
   if (!admission || admission.ok !== true) {
