@@ -6,6 +6,8 @@
 
    Responsibilities:
      - Create and retain backend-owned candidate AI sessions.
+     - Validate local platform/Partition boarding continuity supplied by Electron.
+     - Select first or returning boarding without trusting provider-side memory.
      - Deliver governed orientation one stage at a time.
      - Accept provider responses transported by Electron.
      - Activate ACTIVE_PARTITION only after orientation succeeds.
@@ -14,7 +16,8 @@
      - Close sessions and revoke ACTIVE_PARTITION access.
 
    Authority contract:
-     - Electron owns provider credentials and provider transport.
+     - Electron owns provider credentials, provider transport, and local reads.
+     - Electron supplies local boarding facts but does not select boarding mode.
      - This module never receives an API key or creates a provider client.
      - The backend alone advances admission state and grants capabilities.
 ========================================================================= */
@@ -28,6 +31,14 @@ const {
   submitOrientationResponse,
   getOrientationStatus
 } = require('./orientation/ai.orientation.cjs');
+const {
+  BOARDING_MODES,
+  createBoardingRecord,
+  createPlatformContinuityRecord,
+  selectBoardingMode,
+  validateCandidateArtifact,
+  validatePlatformContinuityRecord
+} = require('./orientation/boarding.record.cjs');
 const ActivePartitionGateway = require('../partition/api/active-partition.gateway.cjs');
 
 const sessions = new Map();
@@ -79,6 +90,75 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function requirePartitionId(value) {
+  const partitionId = typeof value === 'string' ? value.trim() : '';
+  if (!partitionId) {
+    throw new Error(
+      'Local boarding context must identify the active Partition.'
+    );
+  }
+  return partitionId;
+}
+
+function normalizeLocalBoardingContext(value, provider, model) {
+  if (!isPlainObject(value)) {
+    throw new Error('A valid localBoardingContext object is required.');
+  }
+
+  const partitionId = requirePartitionId(value.partitionId);
+  const suppliedContinuity = value.platformContinuity ?? null;
+  const suppliedNotes = value.orientationNotes ?? null;
+
+  let platformContinuity;
+
+  if (suppliedContinuity === null) {
+    platformContinuity = createPlatformContinuityRecord({
+      platform: provider,
+      partitionId,
+      model
+    });
+  } else {
+    validatePlatformContinuityRecord(suppliedContinuity, {
+      platform: provider,
+      partitionId
+    });
+    platformContinuity = clone(suppliedContinuity);
+  }
+
+  const boardingMode = selectBoardingMode({
+    platform: provider,
+    partitionId,
+    continuityRecord: platformContinuity
+  });
+
+  if (boardingMode === BOARDING_MODES.FIRST && suppliedNotes !== null) {
+    throw new Error(
+      'First boarding cannot receive prior Orientation Notes.'
+    );
+  }
+
+  if (boardingMode === BOARDING_MODES.RETURNING && suppliedNotes === null) {
+    throw new Error(
+      'Returning boarding requires this platform\'s prior Orientation Notes.'
+    );
+  }
+
+  const priorOrientationNotes = suppliedNotes === null
+    ? null
+    : validateCandidateArtifact(suppliedNotes);
+
+  return {
+    partitionId,
+    boardingMode,
+    platformContinuity,
+    priorOrientationNotes
+  };
+}
+
 function publicOrientation(session) {
   if (!session.orientation) return null;
   return getOrientationStatus(session);
@@ -91,6 +171,15 @@ function publicSession(session) {
     model: session.model,
     params: clone(session.params),
     state: session.state,
+    boardingMode: session.boardingMode,
+    partitionId: session.partitionId,
+    boardingRecord: session.boardingRecord
+      ? {
+          status: session.boardingRecord.boarding.status,
+          currentStep: session.boardingRecord.boarding.currentStep,
+          lastCompletedStep: session.boardingRecord.boarding.lastCompletedStep
+        }
+      : null,
     orientation: publicOrientation(session),
     activePartition: session.activePartition
       ? {
@@ -173,12 +262,26 @@ function connect(config = {}) {
   const {
     provider = 'openai',
     model,
-    params = {}
+    params = {},
+    localBoardingContext
   } = config;
 
   const normalizedProvider = normalizeProvider(provider);
   const resolvedModel = model || defaultModel(normalizedProvider);
   const sessionId = randomUUID();
+
+  let normalizedContext;
+
+  try {
+    normalizedContext = normalizeLocalBoardingContext(
+      localBoardingContext,
+      normalizedProvider,
+      resolvedModel
+    );
+  } catch (err) {
+    console.error('[ai.pipeline] local boarding context rejected:', err.message);
+    return { ok: false, sessionId, error: err.message };
+  }
 
   const session = {
     id: sessionId,
@@ -189,11 +292,22 @@ function connect(config = {}) {
       : {},
     log: [],
     state: 'admission_pending',
+    boardingMode: normalizedContext.boardingMode,
+    partitionId: normalizedContext.partitionId,
+    platformContinuity: normalizedContext.platformContinuity,
+    priorOrientationNotes: normalizedContext.priorOrientationNotes,
+    boardingRecord: createBoardingRecord({
+      sessionId,
+      platform: normalizedProvider,
+      model: resolvedModel,
+      partitionId: normalizedContext.partitionId,
+      mode: normalizedContext.boardingMode
+    }),
     orientation: null,
     activePartition: null,
     pendingTurn: null,
     startedAt: Date.now(),
-    configVersion: '3.0.0'
+    configVersion: '3.1.0'
   };
 
   try {
@@ -201,10 +315,13 @@ function connect(config = {}) {
 
     console.log(
       `[ai.pipeline] Candidate session created: ${sessionId} ` +
-      `(${normalizedProvider}/${resolvedModel || 'local-default'})`
+      `(${normalizedProvider}/${resolvedModel || 'local-default'}, ` +
+      `${session.boardingMode} boarding, Partition ${session.partitionId})`
     );
 
     const orientation = beginOrientation(session, {
+      boardingMode: session.boardingMode,
+      priorOrientationNotes: clone(session.priorOrientationNotes),
       onProgress(progress) {
         console.log('[ai.pipeline] Orientation progress:', progress);
       }
@@ -217,6 +334,8 @@ function connect(config = {}) {
       sessionId,
       provider: session.provider,
       model: session.model,
+      partitionId: session.partitionId,
+      boardingMode: session.boardingMode,
       state: session.state,
       orientation: orientation.orientation,
       operation: orientation.operation
@@ -230,10 +349,6 @@ function connect(config = {}) {
 
 /* ------------------------------------------------------------------------
    ORIENTATION RESPONSE
-
-   Accepts one provider response transported by Electron. When the final
-   stage is validly acknowledged, the backend activates ACTIVE_PARTITION and
-   alone declares ready_for_introduction.
 ------------------------------------------------------------------------ */
 function advanceOrientation({ sessionId, response } = {}) {
   const lookup = getRequiredSession(sessionId);
@@ -263,6 +378,8 @@ function advanceOrientation({ sessionId, response } = {}) {
         sessionId: normalizedSessionId,
         provider: session.provider,
         model: session.model,
+        partitionId: session.partitionId,
+        boardingMode: session.boardingMode,
         admitted: false
       };
     }
@@ -277,6 +394,8 @@ function advanceOrientation({ sessionId, response } = {}) {
       sessionId: normalizedSessionId,
       provider: session.provider,
       model: session.model,
+      partitionId: session.partitionId,
+      boardingMode: session.boardingMode,
       state: session.state,
       orientation: publicOrientation(session),
       activePartition: {
@@ -330,10 +449,6 @@ function currentOperation({ sessionId } = {}) {
 
 /* ------------------------------------------------------------------------
    CHAT
-
-   Chat is two-step because Electron owns provider transport:
-     1. beginChat() returns a governed provider operation.
-     2. completeChat() records the provider reply and restores ready state.
 ------------------------------------------------------------------------ */
 function beginChat({ sessionId, message } = {}) {
   const lookup = getRequiredSession(sessionId);
