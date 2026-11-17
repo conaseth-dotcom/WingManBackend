@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wingman://schemas/ai/platform.continuity.schema.json",
+  "title": "WingMan AI Platform Continuity Record",
+  "description": "WingMan-owned continuity record for one AI platform within one Partition. Determines first versus returning boarding from successful prior admission, independent of model or credential changes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "recordType",
+    "platform",
+    "partition",
+    "boardingContinuity",
+    "orientationNotes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "recordType": {
+      "const": "wingman_ai_platform_continuity"
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "createdAt", "lastSeenAt", "lastModel"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Normalized WingMan platform identity such as openai, anthropic, gemini, deepseek, ollama, or lmstudio. Model and credential are not continuity identity."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastSeenAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastModel": {
+          "type": ["string", "null"],
+          "description": "Diagnostic runtime metadata only. Changing the model does not create a new platform continuity identity."
+        }
+      }
+    },
+    "partition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable identity of the Partition that scopes this platform continuity record."
+        }
+      }
+    },
+    "boardingContinuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "successfulBoardings",
+        "firstSuccessfulBoardingAt",
+        "lastSuccessfulBoardingAt",
+        "lastSuccessfulSessionId",
+        "lastSuccessfulBoardingRecord"
+      ],
+      "properties": {
+        "successfulBoardings": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Only attempts that reached successful governed admission increment this value. Failed or aborted attempts never establish returning status."
+        },
+        "firstSuccessfulBoardingAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "lastSuccessfulBoardingAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "lastSuccessfulSessionId": {
+          "type": ["string", "null"]
+        },
+        "lastSuccessfulBoardingRecord": {
+          "type": ["string", "null"],
+          "description": "WingMan-managed reference to the most recent successful boarding diagnostic record."
+        }
+      }
+    },
+    "orientationNotes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exists",
+        "recordVersion",
+        "path",
+        "createdAt",
+        "lastUpdatedAt",
+        "ownerPlatform",
+        "writePolicy",
+        "boardingVisibilityPolicy"
+      ],
+      "properties": {
+        "exists": {
+          "type": "boolean"
+        },
+        "recordVersion": {
+          "type": ["string", "null"]
+        },
+        "path": {
+          "type": ["string", "null"],
+          "description": "WingMan-managed reference to this platform's current Orientation Notes within the active Partition."
+        },
+        "createdAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "lastUpdatedAt": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "ownerPlatform": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must correspond to platform.id. Ownership never transfers between AI platforms."
+        },
+        "writePolicy": {
+          "const": "owner_platform_during_governed_boarding_only",
+          "description": "The originating platform may revise its Orientation Notes only during its own governed boarding or reorientation. Outside boarding they are read-only."
+        },
+        "boardingVisibilityPolicy": {
+          "const": "owner_platform_only",
+          "description": "During boarding, a platform may receive only its own prior Orientation Notes. Other platforms' Orientation Notes are not supplied or exposed."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "boardingContinuity": {
+            "properties": {
+              "successfulBoardings": { "const": 0 }
+            },
+            "required": ["successfulBoardings"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "boardingContinuity": {
+            "properties": {
+              "firstSuccessfulBoardingAt": { "type": "null" },
+              "lastSuccessfulBoardingAt": { "type": "null" },
+              "lastSuccessfulSessionId": { "type": "null" },
+              "lastSuccessfulBoardingRecord": { "type": "null" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "orientationNotes": {
+            "properties": {
+              "exists": { "const": false }
+            },
+            "required": ["exists"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "orientationNotes": {
+            "properties": {
+              "recordVersion": { "type": "null" },
+              "path": { "type": "null" },
+              "createdAt": { "type": "null" },
+              "lastUpdatedAt": { "type": "null" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
