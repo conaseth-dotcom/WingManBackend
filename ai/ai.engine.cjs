@@ -6,39 +6,47 @@
 
    Authority:
      - The backend creates and owns AI sessions.
-     - The backend performs governed AI orientation.
+     - The backend owns governed orientation state and progression.
      - The backend activates and deactivates session capabilities.
-     - The frontend may request these operations, but does not perform them.
+     - Electron owns provider credentials and provider transport.
+     - The frontend may request and transport operations, but may not admit
+       the AI or grant capabilities.
 ========================================================================= */
 
 'use strict';
 
 const AIPipeline = require('./ai.pipeline.cjs');
 
+function requireSessionId(sessionId) {
+  const normalizedSessionId =
+    typeof sessionId === 'string' ? sessionId.trim() : '';
+
+  if (!normalizedSessionId) {
+    return {
+      ok: false,
+      error: 'A valid AI sessionId is required.'
+    };
+  }
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId
+  };
+}
+
 /* ------------------------------------------------------------------------
    CONNECT
 
-   Creates one persistent backend-owned AI session. AIPipeline.connect()
-   performs provider connection, governed orientation, and capability setup.
+   Creates one backend-owned candidate session and returns the first governed
+   orientation operation for Electron to transport to the local provider.
+   No provider credentials enter the backend.
 ------------------------------------------------------------------------ */
-async function connect({
-  provider = 'openai',
-  apiKey,
-  model,
-  baseUrl,
-  params = {},
-  orgId,
-  projectId
-} = {}) {
+function connect({ provider = 'openai', model, params = {} } = {}) {
   try {
-    const result = await AIPipeline.connect({
+    const result = AIPipeline.connect({
       provider,
-      apiKey,
       model,
-      baseUrl,
-      params,
-      orgId,
-      projectId
+      params
     });
 
     if (!result || result.ok !== true) {
@@ -48,15 +56,7 @@ async function connect({
       };
     }
 
-    return {
-      ok: true,
-      active: true,
-      sessionId: result.sessionId,
-      provider: result.provider,
-      model: result.model,
-      state: result.state,
-      orientation: result.orientation
-    };
+    return result;
   } catch (err) {
     console.error('[AIEngine] connect failed:', err);
     return { ok: false, error: err.message };
@@ -64,29 +64,91 @@ async function connect({
 }
 
 /* ------------------------------------------------------------------------
+   ORIENTATION
+------------------------------------------------------------------------ */
+function advanceOrientation({ sessionId, response } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+
+    return AIPipeline.advanceOrientation({
+      sessionId: validated.sessionId,
+      response
+    });
+  } catch (err) {
+    console.error('[AIEngine] advanceOrientation failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+function currentOperation({ sessionId } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+
+    return AIPipeline.currentOperation({
+      sessionId: validated.sessionId
+    });
+  } catch (err) {
+    console.error('[AIEngine] currentOperation failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+/* ------------------------------------------------------------------------
    CHAT
 
-   Uses an existing backend-owned session. It does not create, orient, or
-   close a session. Conversation continuity belongs to the backend session.
+   Chat is deliberately split around Electron-owned provider transport.
+   beginChat() prepares the governed operation. completeChat() records the
+   returned provider reply in backend-owned continuity.
 ------------------------------------------------------------------------ */
-async function chat({ sessionId, message, history = [], onChunk } = {}) {
+function beginChat({ sessionId, message } = {}) {
   try {
-    if (typeof sessionId !== 'string' || !sessionId.trim()) {
-      return { ok: false, error: 'A valid AI sessionId is required.' };
-    }
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
 
     if (typeof message !== 'string' || !message.trim()) {
       return { ok: false, error: 'A non-empty user message is required.' };
     }
 
-    return await AIPipeline.chat({
-      sessionId: sessionId.trim(),
-      message: message.trim(),
-      history: Array.isArray(history) ? history : [],
-      onChunk: typeof onChunk === 'function' ? onChunk : undefined
+    return AIPipeline.beginChat({
+      sessionId: validated.sessionId,
+      message: message.trim()
     });
   } catch (err) {
-    console.error('[AIEngine] chat failed:', err);
+    console.error('[AIEngine] beginChat failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+function completeChat({ sessionId, turnId, reply } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+
+    return AIPipeline.completeChat({
+      sessionId: validated.sessionId,
+      turnId,
+      reply
+    });
+  } catch (err) {
+    console.error('[AIEngine] completeChat failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+function failPendingTurn({ sessionId, turnId, error } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+
+    return AIPipeline.failPendingTurn({
+      sessionId: validated.sessionId,
+      turnId,
+      error
+    });
+  } catch (err) {
+    console.error('[AIEngine] failPendingTurn failed:', err);
     return { ok: false, error: err.message };
   }
 }
@@ -96,30 +158,37 @@ async function chat({ sessionId, message, history = [], onChunk } = {}) {
 ------------------------------------------------------------------------ */
 function status({ sessionId } = {}) {
   try {
-    if (typeof sessionId !== 'string' || !sessionId.trim()) {
-      return { ok: false, error: 'A valid AI sessionId is required.' };
-    }
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
 
-    const session = AIPipeline.getSession(sessionId.trim());
+    const session = AIPipeline.getSession(validated.sessionId);
 
     if (!session) {
       return {
         ok: true,
         active: false,
-        sessionId: sessionId.trim(),
+        admitted: false,
+        sessionId: validated.sessionId,
         state: 'disconnected'
       };
     }
 
+    const admitted =
+      session.state === 'ready_for_introduction' ||
+      session.state === 'ready' ||
+      session.state === 'awaiting_provider_response';
+
     return {
       ok: true,
-      active: true,
+      active: admitted,
+      admitted,
       sessionId: session.id,
       provider: session.provider,
       model: session.model,
       state: session.state,
       orientation: session.orientation,
       activePartition: session.activePartition || null,
+      pendingTurn: session.pendingTurn || null,
       startedAt: session.startedAt
     };
   } catch (err) {
@@ -136,11 +205,12 @@ function status({ sessionId } = {}) {
 ------------------------------------------------------------------------ */
 function disconnect({ sessionId } = {}) {
   try {
-    if (typeof sessionId !== 'string' || !sessionId.trim()) {
-      return { ok: false, error: 'A valid AI sessionId is required.' };
-    }
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
 
-    return AIPipeline.disconnect({ sessionId: sessionId.trim() });
+    return AIPipeline.disconnect({
+      sessionId: validated.sessionId
+    });
   } catch (err) {
     console.error('[AIEngine] disconnect failed:', err);
     return { ok: false, error: err.message };
@@ -149,7 +219,11 @@ function disconnect({ sessionId } = {}) {
 
 module.exports = {
   connect,
-  chat,
+  advanceOrientation,
+  currentOperation,
+  beginChat,
+  completeChat,
+  failPendingTurn,
   status,
   disconnect
 };
