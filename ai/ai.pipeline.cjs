@@ -16,13 +16,26 @@ const {
 } = require('./orientation/ai.orientation.cjs');
 const {
   BOARDING_MODES,
+  BOARDING_STATUSES,
   createBoardingRecord,
   createPlatformContinuityRecord,
   selectBoardingMode,
   validateCandidateArtifact,
-  validatePlatformContinuityRecord
+  validatePlatformContinuityRecord,
+  markAdmission,
+  markReadyForIntroduction,
+  setBoardingStatus
 } = require('./orientation/boarding.record.cjs');
 const ActivePartitionGateway = require('../partition/api/active-partition.gateway.cjs');
+
+const PERSIST_BOARDING_SNAPSHOT = 'persist_boarding_snapshot';
+const PERSIST_ORIENTATION_NOTES = 'persist_orientation_notes';
+
+const PERSISTENCE_PHASES = Object.freeze({
+  ORIENTATION_CHECKPOINT: 'orientation_checkpoint',
+  FINAL_ORIENTATION_NOTES: 'final_orientation_notes',
+  PRE_INTRODUCTION_ADMISSION: 'pre_introduction_admission'
+});
 
 const sessions = new Map();
 
@@ -144,7 +157,8 @@ function publicSession(session) {
       ? {
           status: session.boardingRecord.boarding.status,
           currentStep: session.boardingRecord.boarding.currentStep,
-          lastCompletedStep: session.boardingRecord.boarding.lastCompletedStep
+          lastCompletedStep: session.boardingRecord.boarding.lastCompletedStep,
+          admission: clone(session.boardingRecord.admission)
         }
       : null,
     orientation: publicOrientation(session),
@@ -154,6 +168,13 @@ function publicSession(session) {
           operations: [...session.activePartition.operations]
         }
       : null,
+    persistence: {
+      orientationNotesPath: session.orientationNotesPath || null,
+      preIntroductionBoardingRecordPath:
+        session.preIntroductionBoardingRecordPath || null,
+      pendingType: session.pendingPersistence?.type || null,
+      pendingPhase: session.pendingPersistence?.phase || null
+    },
     pendingTurn: session.pendingTurn
       ? {
           id: session.pendingTurn.id,
@@ -188,8 +209,73 @@ function buildConversationMessages(session, userMessage) {
   ];
 }
 
+function buildBoardingSnapshotOperation(session, phase, completedStepId = null) {
+  return {
+    type: PERSIST_BOARDING_SNAPSHOT,
+    persistenceType: PERSIST_BOARDING_SNAPSHOT,
+    persistencePhase: phase,
+    sessionId: session.id,
+    platform: session.provider,
+    partitionId: session.partitionId,
+    completedStepId,
+    record: clone(session.boardingRecord)
+  };
+}
+
+function buildOrientationNotesOperation(session) {
+  return {
+    type: PERSIST_ORIENTATION_NOTES,
+    persistenceType: PERSIST_ORIENTATION_NOTES,
+    persistencePhase: PERSISTENCE_PHASES.FINAL_ORIENTATION_NOTES,
+    sessionId: session.id,
+    platform: session.provider,
+    partitionId: session.partitionId,
+    recordVersion: '1.0.0',
+    record: clone(session.boardingRecord.candidate)
+  };
+}
+
+function setPendingPersistence(session, {
+  type,
+  phase,
+  operation,
+  completedStepId = null
+}) {
+  session.pendingPersistence = {
+    type,
+    phase,
+    completedStepId,
+    createdAt: Date.now(),
+    operation: clone(operation),
+    error: null
+  };
+  return clone(operation);
+}
+
+function beginFinalOrientationNotesPersistence(session) {
+  validateCandidateArtifact(session.boardingRecord.candidate);
+  markAdmission(session.boardingRecord, 'orientationValidated', true);
+  setBoardingStatus(session.boardingRecord, BOARDING_STATUSES.PERSISTING_NOTES, {
+    currentStep: 'PERSIST_ORIENTATION_NOTES',
+    detail: 'Final candidate Orientation Notes validated; local persistence required.'
+  });
+
+  session.state = 'persisting_orientation_notes';
+  const operation = buildOrientationNotesOperation(session);
+  return setPendingPersistence(session, {
+    type: PERSIST_ORIENTATION_NOTES,
+    phase: PERSISTENCE_PHASES.FINAL_ORIENTATION_NOTES,
+    operation
+  });
+}
+
 function activatePartition(session) {
   session.state = 'activating_partition';
+  setBoardingStatus(session.boardingRecord, BOARDING_STATUSES.ACTIVATING_PARTITION, {
+    currentStep: 'ACTIVATE_ACTIVE_PARTITION',
+    detail: 'Verified Orientation Notes persisted; activating ACTIVE_PARTITION.'
+  });
+
   const partitionAccess = ActivePartitionGateway.activate({ sessionId: session.id });
 
   if (!partitionAccess || partitionAccess.ok !== true) {
@@ -206,9 +292,74 @@ function activatePartition(session) {
       ? [...partitionAccess.operations]
       : []
   };
-  session.state = 'ready_for_introduction';
+
+  markAdmission(session.boardingRecord, 'activePartitionActivated', true);
   console.log(`[ai.pipeline] ACTIVE_PARTITION activated: ${session.id}`);
   return session.activePartition;
+}
+
+function beginPreIntroductionAdmissionPersistence(session) {
+  markReadyForIntroduction(session.boardingRecord);
+  session.state = 'persisting_pre_introduction_admission';
+
+  const operation = buildBoardingSnapshotOperation(
+    session,
+    PERSISTENCE_PHASES.PRE_INTRODUCTION_ADMISSION,
+    session.boardingRecord.boarding.lastCompletedStep
+  );
+
+  return setPendingPersistence(session, {
+    type: PERSIST_BOARDING_SNAPSHOT,
+    phase: PERSISTENCE_PHASES.PRE_INTRODUCTION_ADMISSION,
+    operation,
+    completedStepId: session.boardingRecord.boarding.lastCompletedStep
+  });
+}
+
+function buildPipelineResult(session, {
+  ok = true,
+  active = false,
+  admitted = false,
+  complete = false,
+  persistenceType = null,
+  verified = false,
+  path = null,
+  operation = null,
+  error = null
+} = {}) {
+  const result = {
+    ok,
+    active,
+    admitted,
+    complete,
+    sessionId: session.id,
+    provider: session.provider,
+    model: session.model,
+    partitionId: session.partitionId,
+    boardingMode: session.boardingMode,
+    state: session.state,
+    orientation: publicOrientation(session),
+    boardingRecord: {
+      status: session.boardingRecord.boarding.status,
+      currentStep: session.boardingRecord.boarding.currentStep,
+      lastCompletedStep: session.boardingRecord.boarding.lastCompletedStep,
+      admission: clone(session.boardingRecord.admission)
+    },
+    activePartition: session.activePartition
+      ? {
+          ...session.activePartition,
+          operations: [...session.activePartition.operations]
+        }
+      : null,
+    operation: clone(operation)
+  };
+
+  if (persistenceType) result.persistenceType = persistenceType;
+  if (verified) result.verified = true;
+  if (path) result.path = path;
+  if (error) result.error = error;
+
+  return result;
 }
 
 function connect(config = {}) {
@@ -259,8 +410,10 @@ function connect(config = {}) {
     activePartition: null,
     pendingTurn: null,
     pendingPersistence: null,
+    orientationNotesPath: null,
+    preIntroductionBoardingRecordPath: null,
     startedAt: Date.now(),
-    configVersion: '3.2.0'
+    configVersion: '3.3.0'
   };
 
   try {
@@ -320,36 +473,14 @@ function advanceOrientation({ sessionId, response } = {}) {
       }
     });
 
-    if (!result.ok || !result.complete) {
-      return {
-        ...result,
-        sessionId: normalizedSessionId,
-        provider: session.provider,
-        model: session.model,
-        partitionId: session.partitionId,
-        boardingMode: session.boardingMode,
-        admitted: false
-      };
-    }
-
-    const activePartition = activatePartition(session);
     return {
-      ok: true,
-      active: true,
-      admitted: true,
-      complete: true,
+      ...result,
       sessionId: normalizedSessionId,
       provider: session.provider,
       model: session.model,
       partitionId: session.partitionId,
       boardingMode: session.boardingMode,
-      state: session.state,
-      orientation: publicOrientation(session),
-      activePartition: {
-        ...activePartition,
-        operations: [...activePartition.operations]
-      },
-      operation: null
+      admitted: false
     };
   } catch (err) {
     console.error('[ai.pipeline] orientation response error:', err.message);
@@ -377,7 +508,7 @@ function submitPersistenceResult({ sessionId, persistenceType, result } = {}) {
       ok: false,
       sessionId: normalizedSessionId,
       state: session.state,
-      error: 'No orientation persistence operation is pending.'
+      error: 'No boarding persistence operation is pending.'
     };
   }
 
@@ -394,64 +525,112 @@ function submitPersistenceResult({ sessionId, persistenceType, result } = {}) {
     const error = result?.error || 'Local persistence was not verified.';
     session.state = 'persistence_failed';
     pending.error = error;
-    return {
+    return buildPipelineResult(session, {
       ok: false,
-      sessionId: normalizedSessionId,
-      state: session.state,
       persistenceType: normalizedType,
       error
-    };
+    });
   }
 
+  const verifiedPath = typeof result.path === 'string' && result.path.trim()
+    ? result.path.trim()
+    : null;
+  const completedPending = {
+    ...pending,
+    phase: pending.phase || (
+      pending.type === PERSIST_BOARDING_SNAPSHOT
+        ? PERSISTENCE_PHASES.ORIENTATION_CHECKPOINT
+        : null
+    )
+  };
   session.pendingPersistence = null;
-  session.state = 'orienting';
 
-  const operation = getCurrentOrientationOperation(session);
-  const orientationComplete =
-    session.state === 'orientation_complete' && !operation;
+  try {
+    if (completedPending.phase === PERSISTENCE_PHASES.ORIENTATION_CHECKPOINT) {
+      session.state = 'orienting';
+      const operation = getCurrentOrientationOperation(session);
 
-  if (!orientationComplete) {
-    return {
-      ok: true,
-      active: false,
-      admitted: false,
-      complete: false,
-      sessionId: normalizedSessionId,
-      provider: session.provider,
-      model: session.model,
-      partitionId: session.partitionId,
-      boardingMode: session.boardingMode,
-      state: session.state,
+      if (operation) {
+        return buildPipelineResult(session, {
+          persistenceType: normalizedType,
+          verified: true,
+          path: verifiedPath,
+          operation
+        });
+      }
+
+      if (session.state !== 'orientation_complete') {
+        throw new Error(
+          `Orientation checkpoint completed without a next operation or completion state: ${session.state}`
+        );
+      }
+
+      const notesOperation = beginFinalOrientationNotesPersistence(session);
+      return buildPipelineResult(session, {
+        persistenceType: normalizedType,
+        verified: true,
+        path: verifiedPath,
+        operation: notesOperation
+      });
+    }
+
+    if (completedPending.phase === PERSISTENCE_PHASES.FINAL_ORIENTATION_NOTES) {
+      if (!verifiedPath) {
+        throw new Error('Verified Orientation Notes persistence returned no path.');
+      }
+
+      session.orientationNotesPath = verifiedPath;
+      markAdmission(session.boardingRecord, 'notesPersisted', true);
+      markAdmission(session.boardingRecord, 'notesPersistenceVerified', true);
+
+      activatePartition(session);
+      const admissionOperation = beginPreIntroductionAdmissionPersistence(session);
+
+      return buildPipelineResult(session, {
+        active: true,
+        admitted: false,
+        persistenceType: normalizedType,
+        verified: true,
+        path: verifiedPath,
+        operation: admissionOperation
+      });
+    }
+
+    if (completedPending.phase === PERSISTENCE_PHASES.PRE_INTRODUCTION_ADMISSION) {
+      if (!verifiedPath) {
+        throw new Error(
+          'Verified pre-introduction boarding persistence returned no path.'
+        );
+      }
+
+      session.preIntroductionBoardingRecordPath = verifiedPath;
+      session.state = 'ready_for_introduction';
+
+      return buildPipelineResult(session, {
+        active: true,
+        admitted: true,
+        complete: true,
+        persistenceType: normalizedType,
+        verified: true,
+        path: verifiedPath,
+        operation: null
+      });
+    }
+
+    throw new Error(
+      `Unsupported persistence phase: ${completedPending.phase || '<missing>'}`
+    );
+  } catch (err) {
+    session.state = 'admission_finalization_failed';
+    console.error('[ai.pipeline] persistence advancement error:', err.message);
+    return buildPipelineResult(session, {
+      ok: false,
       persistenceType: normalizedType,
       verified: true,
-      path: result.path || null,
-      orientation: publicOrientation(session),
-      operation
-    };
+      path: verifiedPath,
+      error: err.message
+    });
   }
-
-  const activePartition = activatePartition(session);
-  return {
-    ok: true,
-    active: true,
-    admitted: true,
-    complete: true,
-    sessionId: normalizedSessionId,
-    provider: session.provider,
-    model: session.model,
-    partitionId: session.partitionId,
-    boardingMode: session.boardingMode,
-    state: session.state,
-    persistenceType: normalizedType,
-    verified: true,
-    path: result.path || null,
-    orientation: publicOrientation(session),
-    activePartition: {
-      ...activePartition,
-      operations: [...activePartition.operations]
-    },
-    operation: null
-  };
 }
 
 function currentOperation({ sessionId } = {}) {
@@ -500,13 +679,17 @@ function beginChat({ sessionId, message } = {}) {
   const { session, sessionId: normalizedSessionId } = lookup;
   const userMessage = typeof message === 'string' ? message.trim() : '';
 
-  if (!userMessage) return { ok: false, error: 'A non-empty user message is required.' };
-  if (session.state !== 'ready' && session.state !== 'ready_for_introduction') {
+  if (!userMessage) {
+    return { ok: false, error: 'A non-empty user message is required.' };
+  }
+  if (session.state !== 'ready') {
     return {
       ok: false,
       sessionId: normalizedSessionId,
       state: session.state,
-      error: 'The AI has not been admitted to WingMan.'
+      error: session.state === 'ready_for_introduction'
+        ? 'The AI is admitted but has not completed its introduction.'
+        : 'The AI has not been admitted to WingMan.'
     };
   }
   if (session.pendingTurn) {
@@ -556,13 +739,28 @@ function completeChat({ sessionId, turnId, reply } = {}) {
   const fullReply = typeof reply === 'string' ? reply.trim() : '';
 
   if (!pending || pending.type !== 'chat_turn') {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'No chat turn is awaiting a provider response.' };
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No chat turn is awaiting a provider response.'
+    };
   }
   if (!normalizedTurnId || normalizedTurnId !== pending.id) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'The provider response does not match the pending chat turn.' };
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The provider response does not match the pending chat turn.'
+    };
   }
   if (!fullReply) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'A non-empty provider reply is required.' };
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'A non-empty provider reply is required.'
+    };
   }
 
   const completedAt = Date.now();
@@ -593,10 +791,20 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
   const normalizedTurnId = typeof turnId === 'string' ? turnId.trim() : '';
 
   if (!pending) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'No provider turn is pending.' };
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No provider turn is pending.'
+    };
   }
   if (normalizedTurnId && normalizedTurnId !== pending.id) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'The failure does not match the pending provider turn.' };
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The failure does not match the pending provider turn.'
+    };
   }
 
   session.pendingTurn = null;
@@ -617,7 +825,9 @@ function disconnect({ sessionId } = {}) {
 
   let partitionResult = null;
   if (typeof ActivePartitionGateway.deactivate === 'function') {
-    partitionResult = ActivePartitionGateway.deactivate({ sessionId: normalizedSessionId });
+    partitionResult = ActivePartitionGateway.deactivate({
+      sessionId: normalizedSessionId
+    });
   }
 
   sessions.delete(normalizedSessionId);
@@ -638,6 +848,9 @@ function getSession(sessionId) {
 }
 
 module.exports = {
+  PERSIST_BOARDING_SNAPSHOT,
+  PERSIST_ORIENTATION_NOTES,
+  PERSISTENCE_PHASES,
   connect,
   advanceOrientation,
   submitPersistenceResult,

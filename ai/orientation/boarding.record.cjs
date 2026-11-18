@@ -535,7 +535,7 @@ function markAdmission(record, field, value = true) {
   return record;
 }
 
-function assertReadyForParticipant(record) {
+function assertReadyForIntroduction(record) {
   requireBoardingRecord(record);
   const admission = record.admission;
   const unmet = [];
@@ -547,7 +547,35 @@ function assertReadyForParticipant(record) {
 
   if (unmet.length > 0) {
     throw new Error(
-      `[AI Boarding] Participant Ready is blocked; unmet conditions: ${unmet.join(', ')}`
+      `[AI Boarding] Ready For Introduction is blocked; unmet conditions: ${unmet.join(', ')}`
+    );
+  }
+
+  return true;
+}
+
+function markReadyForIntroduction(record) {
+  assertReadyForIntroduction(record);
+
+  record.boarding.status = BOARDING_STATUSES.READY_FOR_INTRODUCTION;
+  record.boarding.currentStep = 'INTRODUCTION';
+  record.boarding.error = null;
+
+  appendEvent(record, {
+    type: 'ready_for_introduction',
+    step: 'INTRODUCTION',
+    detail: 'Admission prerequisites verified; introduction is authorized.'
+  });
+
+  return record;
+}
+
+function assertReadyForParticipant(record) {
+  assertReadyForIntroduction(record);
+
+  if (!record.admission.introductionReleased) {
+    throw new Error(
+      '[AI Boarding] Participant Ready is blocked; unmet condition: introductionReleased'
     );
   }
 
@@ -557,8 +585,6 @@ function assertReadyForParticipant(record) {
 function markParticipantReady(record) {
   assertReadyForParticipant(record);
   markAdmission(record, 'participantReady', true);
-  record.boarding.status = BOARDING_STATUSES.READY_FOR_INTRODUCTION;
-  record.boarding.currentStep = 'INTRODUCTION';
   touch(record);
   return record;
 }
@@ -661,6 +687,8 @@ module.exports = {
   rejectCandidateArtifact,
   recordFailure,
   markAdmission,
+  assertReadyForIntroduction,
+  markReadyForIntroduction,
   assertReadyForParticipant,
   markParticipantReady,
   completeBoarding,
