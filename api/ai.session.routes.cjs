@@ -110,6 +110,35 @@ router.get('/session/:sessionId/status', (req, res) => {
   }
 });
 
+router.post('/introduction/begin', (req, res) => {
+  console.log('[WM-INTRODUCTION] POST /api/ai/introduction/begin');
+  try {
+    const { sessionId, preferredName } = req.body || {};
+    return sendResult(res, AIEngine.beginIntroduction({
+      sessionId,
+      preferredName
+    }));
+  } catch (err) {
+    console.error('[WM-INTRODUCTION] Introduction preparation failed:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+router.post('/introduction/complete', (req, res) => {
+  console.log('[WM-INTRODUCTION] POST /api/ai/introduction/complete');
+  try {
+    const { sessionId, turnId, reply } = req.body || {};
+    return sendResult(res, AIEngine.completeIntroduction({
+      sessionId,
+      turnId,
+      reply
+    }));
+  } catch (err) {
+    console.error('[WM-INTRODUCTION] Introduction completion failed:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 router.post('/chat/begin', (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/begin');
   try {

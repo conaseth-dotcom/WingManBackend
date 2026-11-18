@@ -93,6 +93,35 @@ function currentOperation({ sessionId } = {}) {
   }
 }
 
+function beginIntroduction({ sessionId, preferredName } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+    return AIPipeline.beginIntroduction({
+      sessionId: validated.sessionId,
+      preferredName
+    });
+  } catch (err) {
+    console.error('[AIEngine] beginIntroduction failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
+function completeIntroduction({ sessionId, turnId, reply } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+    return AIPipeline.completeIntroduction({
+      sessionId: validated.sessionId,
+      turnId,
+      reply
+    });
+  } catch (err) {
+    console.error('[AIEngine] completeIntroduction failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+
 function beginChat({ sessionId, message } = {}) {
   try {
     const validated = requireSessionId(sessionId);
@@ -198,6 +227,8 @@ module.exports = {
   advanceOrientation,
   submitPersistenceResult,
   currentOperation,
+  beginIntroduction,
+  completeIntroduction,
   beginChat,
   completeChat,
   failPendingTurn,

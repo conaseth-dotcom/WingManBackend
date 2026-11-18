@@ -24,17 +24,23 @@ const {
   validatePlatformContinuityRecord,
   markAdmission,
   markReadyForIntroduction,
+  markParticipantReady,
+  completeBoarding,
+  markSuccessfulContinuity,
   setBoardingStatus
 } = require('./orientation/boarding.record.cjs');
 const ActivePartitionGateway = require('../partition/api/active-partition.gateway.cjs');
 
 const PERSIST_BOARDING_SNAPSHOT = 'persist_boarding_snapshot';
 const PERSIST_ORIENTATION_NOTES = 'persist_orientation_notes';
+const PERSIST_PLATFORM_CONTINUITY = 'persist_platform_continuity';
 
 const PERSISTENCE_PHASES = Object.freeze({
   ORIENTATION_CHECKPOINT: 'orientation_checkpoint',
   FINAL_ORIENTATION_NOTES: 'final_orientation_notes',
-  PRE_INTRODUCTION_ADMISSION: 'pre_introduction_admission'
+  PRE_INTRODUCTION_ADMISSION: 'pre_introduction_admission',
+  COMPLETED_BOARDING: 'completed_boarding',
+  PLATFORM_CONTINUITY: 'platform_continuity'
 });
 
 const sessions = new Map();
@@ -172,6 +178,9 @@ function publicSession(session) {
       orientationNotesPath: session.orientationNotesPath || null,
       preIntroductionBoardingRecordPath:
         session.preIntroductionBoardingRecordPath || null,
+      completedBoardingRecordPath:
+        session.completedBoardingRecordPath || null,
+      platformContinuityPath: session.platformContinuityPath || null,
       pendingType: session.pendingPersistence?.type || null,
       pendingPhase: session.pendingPersistence?.phase || null
     },
@@ -209,6 +218,31 @@ function buildConversationMessages(session, userMessage) {
   ];
 }
 
+function normalizePreferredName(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ').slice(0, 80);
+}
+
+function buildIntroductionMessages(session, preferredName) {
+  const nameInstruction = preferredName
+    ? `The user's preferred name is ${JSON.stringify(preferredName)}. Address the user by that name.`
+    : 'The user has not supplied a preferred name. Introduce yourself without inventing one.';
+
+  return [
+    {
+      role: 'system',
+      content: [
+        buildOperationalSystemMessage(session),
+        'WingMan has admitted you as the AI participant.',
+        'This is your first direct introduction to the user.',
+        nameInstruction,
+        'Introduce yourself naturally and briefly.',
+        'Do not output JSON, discuss the boarding process in detail, or pretend the user already spoke.'
+      ].join('\n')
+    }
+  ];
+}
+
 function buildBoardingSnapshotOperation(session, phase, completedStepId = null) {
   return {
     type: PERSIST_BOARDING_SNAPSHOT,
@@ -232,6 +266,18 @@ function buildOrientationNotesOperation(session) {
     partitionId: session.partitionId,
     recordVersion: '1.0.0',
     record: clone(session.boardingRecord.candidate)
+  };
+}
+
+function buildPlatformContinuityOperation(session) {
+  return {
+    type: PERSIST_PLATFORM_CONTINUITY,
+    persistenceType: PERSIST_PLATFORM_CONTINUITY,
+    persistencePhase: PERSISTENCE_PHASES.PLATFORM_CONTINUITY,
+    sessionId: session.id,
+    platform: session.provider,
+    partitionId: session.partitionId,
+    record: clone(session.platformContinuity)
   };
 }
 
@@ -412,8 +458,11 @@ function connect(config = {}) {
     pendingPersistence: null,
     orientationNotesPath: null,
     preIntroductionBoardingRecordPath: null,
+    completedBoardingRecordPath: null,
+    platformContinuityPath: null,
+    introductionReply: null,
     startedAt: Date.now(),
-    configVersion: '3.3.0'
+    configVersion: '3.4.0'
   };
 
   try {
@@ -617,6 +666,60 @@ function submitPersistenceResult({ sessionId, persistenceType, result } = {}) {
       });
     }
 
+    if (completedPending.phase === PERSISTENCE_PHASES.COMPLETED_BOARDING) {
+      if (!verifiedPath) {
+        throw new Error('Verified completed boarding persistence returned no path.');
+      }
+
+      session.completedBoardingRecordPath = verifiedPath;
+      markSuccessfulContinuity({
+        continuityRecord: session.platformContinuity,
+        boardingRecord: session.boardingRecord,
+        boardingRecordPath: verifiedPath,
+        orientationNotesPath: session.orientationNotesPath,
+        orientationNotesVersion: '1.0.0'
+      });
+
+      session.state = 'persisting_platform_continuity';
+      const continuityOperation = buildPlatformContinuityOperation(session);
+      setPendingPersistence(session, {
+        type: PERSIST_PLATFORM_CONTINUITY,
+        phase: PERSISTENCE_PHASES.PLATFORM_CONTINUITY,
+        operation: continuityOperation
+      });
+
+      return buildPipelineResult(session, {
+        active: true,
+        admitted: true,
+        complete: false,
+        persistenceType: normalizedType,
+        verified: true,
+        path: verifiedPath,
+        operation: continuityOperation
+      });
+    }
+
+    if (completedPending.phase === PERSISTENCE_PHASES.PLATFORM_CONTINUITY) {
+      if (!verifiedPath) {
+        throw new Error('Verified platform continuity persistence returned no path.');
+      }
+
+      session.platformContinuityPath = verifiedPath;
+      session.state = 'ready';
+
+      const readyResult = buildPipelineResult(session, {
+        active: true,
+        admitted: true,
+        complete: true,
+        persistenceType: normalizedType,
+        verified: true,
+        path: verifiedPath,
+        operation: null
+      });
+      readyResult.introduction = session.introductionReply;
+      return readyResult;
+    }
+
     throw new Error(
       `Unsupported persistence phase: ${completedPending.phase || '<missing>'}`
     );
@@ -670,6 +773,139 @@ function currentOperation({ sessionId } = {}) {
     sessionId: normalizedSessionId,
     state: session.state,
     operation: null
+  };
+}
+
+function beginIntroduction({ sessionId, preferredName } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const { session, sessionId: normalizedSessionId } = lookup;
+
+  if (session.state !== 'ready_for_introduction') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: `Session is not ready for introduction: ${session.state}`
+    };
+  }
+  if (!session.activePartition) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The introduction is blocked because ACTIVE_PARTITION is unavailable.'
+    };
+  }
+  if (session.pendingTurn) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'A provider turn is already pending.'
+    };
+  }
+
+  const turnId = randomUUID();
+  const normalizedName = normalizePreferredName(preferredName);
+  const createdAt = Date.now();
+  const operation = {
+    type: 'introduction_turn',
+    turnId,
+    sessionId: normalizedSessionId,
+    provider: session.provider,
+    model: session.model,
+    params: clone(session.params),
+    preferredName: normalizedName || null,
+    messages: buildIntroductionMessages(session, normalizedName)
+  };
+
+  session.pendingTurn = {
+    id: turnId,
+    type: 'introduction_turn',
+    preferredName: normalizedName || null,
+    createdAt,
+    operation
+  };
+  session.state = 'awaiting_introduction_response';
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    state: session.state,
+    operation: clone(operation)
+  };
+}
+
+function completeIntroduction({ sessionId, turnId, reply } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const { session, sessionId: normalizedSessionId } = lookup;
+  const pending = session.pendingTurn;
+  const normalizedTurnId = typeof turnId === 'string' ? turnId.trim() : '';
+  const fullReply = typeof reply === 'string' ? reply.trim() : '';
+
+  if (!pending || pending.type !== 'introduction_turn') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No introduction turn is awaiting a provider response.'
+    };
+  }
+  if (!normalizedTurnId || normalizedTurnId !== pending.id) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The provider response does not match the pending introduction turn.'
+    };
+  }
+  if (!fullReply) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'A non-empty introduction reply is required.'
+    };
+  }
+
+  const completedAt = Date.now();
+  const latencyMs = completedAt - pending.createdAt;
+  session.log.push({ role: 'assistant', content: fullReply, ts: completedAt });
+  session.introductionReply = fullReply;
+  session.pendingTurn = null;
+
+  markAdmission(session.boardingRecord, 'introductionReleased', true);
+  markParticipantReady(session.boardingRecord);
+  completeBoarding(session.boardingRecord);
+
+  session.state = 'persisting_completed_boarding';
+  const operation = buildBoardingSnapshotOperation(
+    session,
+    PERSISTENCE_PHASES.COMPLETED_BOARDING,
+    'INTRODUCTION'
+  );
+  setPendingPersistence(session, {
+    type: PERSIST_BOARDING_SNAPSHOT,
+    phase: PERSISTENCE_PHASES.COMPLETED_BOARDING,
+    operation,
+    completedStepId: 'INTRODUCTION'
+  });
+
+  return {
+    ok: true,
+    active: true,
+    admitted: true,
+    complete: false,
+    sessionId: normalizedSessionId,
+    provider: session.provider,
+    state: session.state,
+    fullReply,
+    reply: fullReply,
+    introduction: fullReply,
+    latencyMs,
+    operation: clone(operation)
   };
 }
 
@@ -808,7 +1044,11 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
   }
 
   session.pendingTurn = null;
-  session.state = session.activePartition ? 'ready' : 'orienting';
+  session.state = pending.type === 'introduction_turn'
+    ? 'ready_for_introduction'
+    : session.activePartition
+      ? 'ready'
+      : 'orienting';
   return {
     ok: true,
     sessionId: normalizedSessionId,
@@ -850,11 +1090,14 @@ function getSession(sessionId) {
 module.exports = {
   PERSIST_BOARDING_SNAPSHOT,
   PERSIST_ORIENTATION_NOTES,
+  PERSIST_PLATFORM_CONTINUITY,
   PERSISTENCE_PHASES,
   connect,
   advanceOrientation,
   submitPersistenceResult,
   currentOperation,
+  beginIntroduction,
+  completeIntroduction,
   beginChat,
   completeChat,
   failPendingTurn,
