@@ -817,6 +817,7 @@ function beginIntroduction({ sessionId, preferredName } = {}) {
     model: session.model,
     params: clone(session.params),
     preferredName: normalizedName || null,
+    message: 'Provide your authorized introduction to the user now.',
     messages: buildIntroductionMessages(session, normalizedName)
   };
 
