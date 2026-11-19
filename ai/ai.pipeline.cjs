@@ -34,6 +34,8 @@ const ActivePartitionGateway = require('../partition/api/active-partition.gatewa
 const PERSIST_BOARDING_SNAPSHOT = 'persist_boarding_snapshot';
 const PERSIST_ORIENTATION_NOTES = 'persist_orientation_notes';
 const PERSIST_PLATFORM_CONTINUITY = 'persist_platform_continuity';
+const SPATIAL_ACTION = 'spatial_action';
+const SPATIAL_ACTIONS = Object.freeze({ ENTER_3D: 'enter_3d', LEAVE_3D: 'leave_3d' });
 
 const PERSISTENCE_PHASES = Object.freeze({
   ORIENTATION_CHECKPOINT: 'orientation_checkpoint',
@@ -64,6 +66,16 @@ function defaultModel(provider) {
 
 function normalizeSessionId(sessionId) {
   return typeof sessionId === 'string' ? sessionId.trim() : '';
+}
+function normalizeSpatialAction(action) {
+  const normalized = typeof action === 'string' ? action.trim().toLowerCase() : '';
+  if (!Object.values(SPATIAL_ACTIONS).includes(normalized)) {
+    throw new Error(`Unsupported spatial action: ${normalized || '<missing>'}`);
+  }
+  return normalized;
+}
+function normalizeSpatialReason(reason) {
+  return typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
 }
 
 function getRequiredSession(sessionId) {
@@ -189,6 +201,15 @@ function publicSession(session) {
           id: session.pendingTurn.id,
           type: session.pendingTurn.type,
           createdAt: session.pendingTurn.createdAt
+        }
+      : null,
+    pendingSpatialAction: session.pendingSpatialAction
+      ? {
+          id: session.pendingSpatialAction.id,
+          action: session.pendingSpatialAction.action,
+          initiatedBy: session.pendingSpatialAction.initiatedBy,
+          reason: session.pendingSpatialAction.reason,
+          createdAt: session.pendingSpatialAction.createdAt
         }
       : null,
     startedAt: session.startedAt,
@@ -455,6 +476,7 @@ function connect(config = {}) {
     orientation: null,
     activePartition: null,
     pendingTurn: null,
+    pendingSpatialAction: null,
     pendingPersistence: null,
     orientationNotesPath: null,
     preIntroductionBoardingRecordPath: null,
@@ -759,6 +781,14 @@ function currentOperation({ sessionId } = {}) {
     };
   }
 
+  if (session.pendingSpatialAction) {
+    return {
+      ok: true,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      operation: clone(session.pendingSpatialAction.operation)
+    };
+  }
   if (session.pendingTurn) {
     return {
       ok: true,
@@ -774,6 +804,66 @@ function currentOperation({ sessionId } = {}) {
     state: session.state,
     operation: null
   };
+}
+
+function beginSpatialAction({ sessionId, action, initiatedBy = 'ai', reason = '', userOverride = false } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const { session, sessionId: normalizedSessionId } = lookup;
+  if (session.state !== 'ready') {
+    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'Spatial actions require an admitted, ready AI session.' };
+  }
+  if (!session.activePartition) {
+    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'Spatial actions are blocked because ACTIVE_PARTITION is unavailable.' };
+  }
+  if (session.pendingTurn || session.pendingSpatialAction) {
+    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'Another governed operation is already pending.' };
+  }
+  let normalizedAction;
+  try { normalizedAction = normalizeSpatialAction(action); }
+  catch (err) { return { ok: false, sessionId: normalizedSessionId, state: session.state, error: err.message }; }
+  const actionId = randomUUID();
+  const createdAt = Date.now();
+  const normalizedInitiator = initiatedBy === 'user' || initiatedBy === 'user_override' ? initiatedBy : 'ai';
+  const operation = {
+    type: SPATIAL_ACTION,
+    actionId,
+    sessionId: normalizedSessionId,
+    action: normalizedAction,
+    initiatedBy: normalizedInitiator,
+    reason: normalizeSpatialReason(reason) || null,
+    userOverride: userOverride === true
+  };
+  session.pendingSpatialAction = {
+    id: actionId,
+    action: normalizedAction,
+    initiatedBy: normalizedInitiator,
+    reason: operation.reason,
+    createdAt,
+    operation
+  };
+  return { ok: true, sessionId: normalizedSessionId, state: session.state, operation: clone(operation) };
+}
+function completeSpatialAction({ sessionId, actionId, result } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const { session, sessionId: normalizedSessionId } = lookup;
+  const pending = session.pendingSpatialAction;
+  const normalizedActionId = typeof actionId === 'string' ? actionId.trim() : '';
+  if (!pending) return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'No spatial action is awaiting a renderer result.' };
+  if (!normalizedActionId || normalizedActionId !== pending.id) {
+    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'The renderer result does not match the pending spatial action.' };
+  }
+  if (!isPlainObject(result) || result.ok !== true) {
+    const error = result?.error || 'The renderer did not complete the spatial action.';
+    session.pendingSpatialAction = null;
+    return { ok: false, sessionId: normalizedSessionId, state: session.state, action: pending.action, error };
+  }
+  session.pendingSpatialAction = null;
+  return { ok: true, sessionId: normalizedSessionId, state: session.state, action: pending.action, spatialState: clone(result.state || null) };
+}
+function failSpatialAction({ sessionId, actionId, error } = {}) {
+  return completeSpatialAction({ sessionId, actionId, result: { ok: false, error: String(error || 'Spatial action failed.') } });
 }
 
 function beginIntroduction({ sessionId, preferredName } = {}) {
@@ -1063,6 +1153,7 @@ function disconnect({ sessionId } = {}) {
   if (!lookup.ok) return lookup;
   const { session, sessionId: normalizedSessionId } = lookup;
   session.state = 'disconnecting';
+  session.pendingSpatialAction = null;
 
   let partitionResult = null;
   if (typeof ActivePartitionGateway.deactivate === 'function') {
@@ -1093,10 +1184,15 @@ module.exports = {
   PERSIST_ORIENTATION_NOTES,
   PERSIST_PLATFORM_CONTINUITY,
   PERSISTENCE_PHASES,
+  SPATIAL_ACTION,
+  SPATIAL_ACTIONS,
   connect,
   advanceOrientation,
   submitPersistenceResult,
   currentOperation,
+  beginSpatialAction,
+  completeSpatialAction,
+  failSpatialAction,
   beginIntroduction,
   completeIntroduction,
   beginChat,
