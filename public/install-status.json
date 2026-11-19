@@ -1,6 +1,6 @@
 {
   "latestLauncherVersion": "1.0.1",
-  "latestWingManVersion": "0.1.002",
+  "latestWingManVersion": "0.1.003",
   "requiredInstallStructureVersion": "electron-win32-x64",
   "requiredPartitionMarkerVersion": "1.0",
   "requiredIntegrityFile": "integrity.json",
@@ -8,5 +8,5 @@
   "minimumPartitionSizeMB": 4096,
   "allowedPartitionUnits": ["MB", "GB"],
   "installSource": "github-release",
-  "zipURL": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/WingManApp-0.1.002-win32-x64.zip"
+  "zipURL": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/WingManApp-0.1.003-win32-x64.zip"
 }

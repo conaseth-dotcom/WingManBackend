@@ -2,7 +2,7 @@
   "releaseBase": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/",
   "app": {
     "id": "WingManApp",
-    "zip": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/WingManApp-0.1.002-win32-x64.zip",
+    "zip": "https://github.com/conaseth-dotcom/WingManBackend/releases/download/Version1.0.0/WingManApp-0.1.003-win32-x64.zip",
     "installPath": "WingMan"
   },
   "partition": {
