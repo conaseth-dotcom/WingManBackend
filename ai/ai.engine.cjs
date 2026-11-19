@@ -8,6 +8,7 @@
 'use strict';
 
 const AIPipeline = require('./ai.pipeline.cjs');
+const sessionLicenses = new Map();
 
 function requireSessionId(sessionId) {
   const normalizedSessionId =
@@ -21,6 +22,7 @@ function requireSessionId(sessionId) {
 }
 
 function connect({
+  licenseContext,
   provider = 'openai',
   model,
   params = {},
@@ -41,7 +43,16 @@ function connect({
       };
     }
 
-    return result;
+    if (!licenseContext?.productRef) {
+      AIPipeline.disconnect({ sessionId: result.sessionId });
+      return { ok: false, error: 'Verified license context is required.' };
+    }
+    sessionLicenses.set(result.sessionId, Object.freeze({
+      productRef: String(licenseContext.productRef).trim(),
+      tier: licenseContext.tier || null,
+      verifiedAt: licenseContext.verifiedAt || new Date().toISOString()
+    }));
+    return { ...result, license: sessionLicenses.get(result.sessionId) };
   } catch (err) {
     console.error('[AIEngine] connect failed:', err);
     return { ok: false, error: err.message };
@@ -203,7 +214,8 @@ function status({ sessionId } = {}) {
       orientation: session.orientation,
       activePartition: session.activePartition || null,
       pendingTurn: session.pendingTurn || null,
-      startedAt: session.startedAt
+      startedAt: session.startedAt,
+      license: sessionLicenses.get(session.id) || null
     };
   } catch (err) {
     console.error('[AIEngine] status failed:', err);
@@ -215,7 +227,9 @@ function disconnect({ sessionId } = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    return AIPipeline.disconnect({ sessionId: validated.sessionId });
+    const result = AIPipeline.disconnect({ sessionId: validated.sessionId });
+    sessionLicenses.delete(validated.sessionId);
+    return result;
   } catch (err) {
     console.error('[AIEngine] disconnect failed:', err);
     return { ok: false, error: err.message };

@@ -91,6 +91,7 @@ function summarizePhases(phases) {
 }
 
 async function startAIOnboarding({
+  licenseContext,
   provider = 'openai',
   model,
   params = {},
@@ -152,6 +153,7 @@ async function startAIOnboarding({
   }
 
   const admission = AIEngine.connect({
+    licenseContext,
     provider,
     model,
     params,

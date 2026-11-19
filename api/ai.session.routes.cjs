@@ -57,7 +57,14 @@ router.post('/invite', async (req, res) => {
       });
     }
 
+    const licenseContext = {
+      productRef: String(productRef).trim(),
+      tier: license.tier,
+      verifiedAt: new Date().toISOString()
+    };
+
     const result = await aiStartup.startAIOnboarding({
+      licenseContext,
       provider,
       model,
       params,
