@@ -11,6 +11,7 @@
 
 const express = require('express');
 const AIEngine = require('../ai/ai.engine.cjs');
+const { verifyLicense } = require('../access/license.gateway.cjs');
 
 const router = express.Router();
 
@@ -36,11 +37,25 @@ router.post('/invite', async (req, res) => {
     }
 
     const {
+      productRef,
       provider = 'openai',
       model,
       params = {},
       localBoardingContext
     } = req.body || {};
+
+    const license = await verifyLicense(productRef);
+    if (license.authorized !== true) {
+      const statusCode = license.serviceReachable ? 403 : 503;
+      return res.status(statusCode).json({
+        ok: false,
+        authorized: false,
+        reason: license.reason,
+        tier: license.tier,
+        serviceReachable: license.serviceReachable,
+        error: 'WingMan backend access is not authorized for this license.'
+      });
+    }
 
     const result = await aiStartup.startAIOnboarding({
       provider,

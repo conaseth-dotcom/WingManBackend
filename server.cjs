@@ -668,6 +668,16 @@
     logger.warn('Providers API unavailable', { err: e.message });
     console.log("[WM-API] Providers API unavailable:", e.message);
   }
+
+  // ─── License authorization route ────────────────────────────────────────────
+  try {
+    console.log("[WM-LICENSE] Loading protected license route…");
+    const licenseProtectedRoutes = require(r('api/license.protected.routes.cjs'));
+    safeMount('/api/license', licenseProtectedRoutes, 'license-protected-api');
+  } catch (e) {
+    logger.error('Protected license route unavailable', { err: e.message });
+    console.log("[WM-LICENSE] Protected license route unavailable:", e.message);
+  }
      // ─── AI routes ──────────────────────────────────────────────────────────────
      
      //  Transport-neutral, backend-authoritative AI session API
