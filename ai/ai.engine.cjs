@@ -104,6 +104,26 @@ function currentOperation({ sessionId } = {}) {
   }
 }
 
+function beginSpatialAction({ sessionId, action, initiatedBy, reason, userOverride } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+    return AIPipeline.beginSpatialAction({ sessionId: validated.sessionId, action, initiatedBy, reason, userOverride });
+  } catch (err) {
+    console.error('[AIEngine] beginSpatialAction failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
+function completeSpatialAction({ sessionId, actionId, result } = {}) {
+  try {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+    return AIPipeline.completeSpatialAction({ sessionId: validated.sessionId, actionId, result });
+  } catch (err) {
+    console.error('[AIEngine] completeSpatialAction failed:', err);
+    return { ok: false, error: err.message };
+  }
+}
 function beginIntroduction({ sessionId, preferredName } = {}) {
   try {
     const validated = requireSessionId(sessionId);
@@ -241,6 +261,8 @@ module.exports = {
   advanceOrientation,
   submitPersistenceResult,
   currentOperation,
+  beginSpatialAction,
+  completeSpatialAction,
   beginIntroduction,
   completeIntroduction,
   beginChat,

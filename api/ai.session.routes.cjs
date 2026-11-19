@@ -132,6 +132,26 @@ router.get('/session/:sessionId/status', (req, res) => {
   }
 });
 
+router.post('/spatial/begin', (req, res) => {
+  console.log('[WM-SPATIAL] POST /api/ai/spatial/begin');
+  try {
+    const { sessionId, action, initiatedBy, reason, userOverride } = req.body || {};
+    return sendResult(res, AIEngine.beginSpatialAction({ sessionId, action, initiatedBy, reason, userOverride }));
+  } catch (err) {
+    console.error('[WM-SPATIAL] Spatial action preparation failed:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+router.post('/spatial/complete', (req, res) => {
+  console.log('[WM-SPATIAL] POST /api/ai/spatial/complete');
+  try {
+    const { sessionId, actionId, result } = req.body || {};
+    return sendResult(res, AIEngine.completeSpatialAction({ sessionId, actionId, result }));
+  } catch (err) {
+    console.error('[WM-SPATIAL] Spatial action completion failed:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 router.post('/introduction/begin', (req, res) => {
   console.log('[WM-INTRODUCTION] POST /api/ai/introduction/begin');
   try {
