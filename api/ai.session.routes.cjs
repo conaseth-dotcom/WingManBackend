@@ -161,10 +161,39 @@ router.post('/introduction/complete', (req, res) => {
   }
 });
 
-router.post('/chat/begin', (req, res) => {
+router.post('/chat/begin', async (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/begin');
   try {
     const { sessionId, message } = req.body || {};
+    const sessionStatus = AIEngine.status({ sessionId });
+
+    if (!sessionStatus || sessionStatus.ok !== true) {
+      return sendResult(res, sessionStatus);
+    }
+
+    const productRef = sessionStatus.license?.productRef;
+    if (!productRef) {
+      return res.status(403).json({
+        ok: false,
+        authorized: false,
+        reason: 'session_license_missing',
+        error: 'This AI session does not have a verified WingMan license identity.'
+      });
+    }
+
+    const license = await verifyLicense(productRef);
+    if (license.authorized !== true) {
+      const statusCode = license.serviceReachable ? 403 : 503;
+      return res.status(statusCode).json({
+        ok: false,
+        authorized: false,
+        reason: license.reason,
+        tier: license.tier,
+        serviceReachable: license.serviceReachable,
+        error: 'WingMan backend access is not currently authorized for this license.'
+      });
+    }
+
     return sendResult(res, AIEngine.beginChat({ sessionId, message }));
   } catch (err) {
     console.error('[WM-CHAT] Chat preparation failed:', err);
