@@ -240,7 +240,6 @@
 
   // ─── Orchestrator integrations ──────────────────────────────────────────────
   const { migrateRoomToPartition } = require(r('core/rooms/rooms.to.partition.cjs'));
-  const { enterWingMan } = require(r('core/ai/wingman.ai.entry.cjs'));
   const { loadSystemMetadata } = require(r('core/system/system.metadata.loader.cjs'));
 
   // ─── AI providers ───────────────────────────────────────────────────────────
@@ -584,26 +583,6 @@
     console.log("[WM-SYSTEM] ERROR — Failed to load system metadata:", e.message);
   }
 
-  // ─── WingMan AI environment ─────────────────────────────────────────────────
-  console.log("[WM-AI] Initialising WingMan AI environment via enterWingMan()…");
-  try {
-    const env = enterWingMan({
-      systemMetadata: app.locals.systemMetadata
-    });
-
-    if (env && env.ok) {
-      app.locals.aiContext = env.context;
-      logger.info('WingMan AI context initialised');
-      console.log("[WM-AI] WingMan AI context initialised");
-    } else {
-      logger.warn('WingMan environment failed to load', { err: env && env.error });
-      console.log("[WM-AI] WingMan environment failed to load:", env && env.error);
-    }
-  } catch (e) {
-    logger.warn('enterWingMan() threw during environment init', { err: e.message });
-    console.log("[WM-AI] enterWingMan() threw:", e.message);
-  }
-
   // ─── AI onboarding (lazy) ───────────────────────────────────────────────────
   let aiStartup;
   console.log("[WM-AI] Loading ai.startup.cjs…");
@@ -714,32 +693,6 @@
     } catch (err) {
       console.log("[WM-ROOMS] ERROR — migrateRoomToPartition threw:", err);
       logger.error('[Rooms-Migrate] Error during migration', { err: err.message });
-      res.json({ ok: false, error: err.message });
-    }
-  });
-
-  // AI context reload route
-  console.log("[WM-AI] Registering /api/ai/reload route…");
-  app.post('/api/ai/reload', async (_req, res) => {
-    console.log("[WM-AI] /api/ai/reload invoked");
-    try {
-      const env = enterWingMan({
-        systemMetadata: app.locals.systemMetadata
-      });
-
-      if (env && env.ok) {
-        app.locals.aiContext = env.context;
-        logger.info('WingMan AI context reloaded');
-        console.log("[WM-AI] WingMan AI context reloaded");
-        res.json({ ok: true });
-      } else {
-        logger.warn('WingMan environment reload failed', { err: env && env.error });
-        console.log("[WM-AI] WingMan environment reload failed:", env && env.error);
-        res.json({ ok: false, error: env && env.error });
-      }
-    } catch (err) {
-      console.log("[WM-AI] ERROR — enterWingMan() threw during reload:", err);
-      logger.error('[AI-Reload] Error during context reload', { err: err.message });
       res.json({ ok: false, error: err.message });
     }
   });
