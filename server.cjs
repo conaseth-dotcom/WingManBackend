@@ -293,26 +293,6 @@
   
   let aiPipeline, personality;
   
-  // Pipeline
-  console.log("[WM-AI] Loading OnboardingPipeline.cjs…");
-  try {
-    let mod = require(r('onboarding/OnboardingPipeline.cjs'));
-    aiPipeline = mod.default || mod;
-
-    if (typeof aiPipeline.init === 'function') {
-      console.log("[WM-AI] Initialising Onboarding Pipeline…");
-      const result = aiPipeline.init({ aiRuntime, eventBus, logger });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] Onboarding Pipeline init completed");
-    }
-
-    logger.info('Onboarding Pipeline initialised');
-    console.log("[WM-AI] Onboarding Pipeline loaded successfully");
-  } catch (e) {
-    logger.warn('Onboarding Pipeline unavailable', { err: e.message });
-    console.log("[WM-AI] Onboarding Pipeline unavailable:", e.message);
-  }
-
   // Chat Runtime
   console.log("[WM-AI] Loading ai.ChatRuntime.cjs…");
   try {
