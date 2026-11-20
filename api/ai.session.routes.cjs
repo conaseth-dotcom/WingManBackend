@@ -135,8 +135,25 @@ router.get('/session/:sessionId/status', (req, res) => {
 router.post('/spatial/begin', (req, res) => {
   console.log('[WM-SPATIAL] POST /api/ai/spatial/begin');
   try {
-    const { sessionId, action, initiatedBy, reason, userOverride } = req.body || {};
-    return sendResult(res, AIEngine.beginSpatialAction({ sessionId, action, initiatedBy, reason, userOverride }));
+    const {
+      sessionId,
+      action,
+      parameters = {},
+      initiatedBy,
+      reason,
+      userOverride
+    } = req.body || {};
+    return sendResult(
+  res,
+  AIEngine.beginSpatialAction({
+    sessionId,
+    action,
+    parameters,
+    initiatedBy,
+    reason,
+    userOverride
+  })
+);
   } catch (err) {
     console.error('[WM-SPATIAL] Spatial action preparation failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
