@@ -293,32 +293,6 @@
   
   let personality;
   
-  // Chat Runtime
-  console.log("[WM-AI] Loading ai.ChatRuntime.cjs…");
-  try {
-    let mod = require(r('ai/ai.ChatRuntime.cjs'));
-    const chatRuntime = mod.default || mod;
-
-    if (typeof chatRuntime.init === 'function') {
-      console.log("[WM-AI] Initialising Chat Runtime…");
-      const result = chatRuntime.init({
-        providers: app.locals.providers,
-        eventBus,
-        logger
-      });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] Chat Runtime init completed");
-    }
-
-    app.locals.ai = app.locals.ai || {};
-    app.locals.ai.runtime = chatRuntime;
-    logger.info('Chat Runtime initialised');
-    console.log("[WM-AI] Chat Runtime loaded successfully");
-  } catch (e) {
-    logger.warn('Chat Runtime unavailable', { err: e.message });
-    console.log("[WM-AI] Chat Runtime unavailable:", e.message);
-  }
-
   // Personality
   console.log("[WM-AI] Loading ai.personality.cjs…");
   try {
