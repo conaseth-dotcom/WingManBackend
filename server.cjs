@@ -311,10 +311,8 @@
   }
 
   app.locals.ai = {
-  runtime: app.locals.ai?.runtime || aiRuntime,
-  pipeline: aiPipeline,
-  personality
-};
+    personality
+  };
   console.log("[WM-AI] app.locals.ai populated");
 
   // ─── Partition System (Full P1) ─────────────────────────────────────────────
