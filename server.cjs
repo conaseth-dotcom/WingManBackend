@@ -291,7 +291,7 @@
   app.locals.providers = PROVIDERS;
   console.log("[WM-AI] Provider map initialised:", Object.keys(PROVIDERS));
   
-  let aiPipeline, personality;
+  let personality;
   
   // Chat Runtime
   console.log("[WM-AI] Loading ai.ChatRuntime.cjs…");
