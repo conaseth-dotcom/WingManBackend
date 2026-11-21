@@ -137,14 +137,24 @@ function completeIntroduction({ sessionId, turnId, reply } = {}) {
     return { ok: false, error: err.message };
   }
 }
-function beginChat({ sessionId, message } = {}) {
+function beginChat({
+  sessionId,
+  message,
+  availableActions = []
+} = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
+
     if (typeof message !== 'string' || !message.trim()) {
       return { ok: false, error: 'A non-empty user message is required.' };
     }
-    return AIPipeline.beginChat({ sessionId: validated.sessionId, message: message.trim() });
+
+    return AIPipeline.beginChat({
+      sessionId: validated.sessionId,
+      message: message.trim(),
+      availableActions
+    });
   } catch (err) {
     console.error('[AIEngine] beginChat failed:', err);
     return { ok: false, error: err.message };
