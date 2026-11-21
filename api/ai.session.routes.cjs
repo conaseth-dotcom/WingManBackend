@@ -144,22 +144,21 @@ router.post('/spatial/begin', (req, res) => {
       userOverride
     } = req.body || {};
     return sendResult(
-      res,
-      AIEngine.beginSpatialAction({
-        sessionId,
-        action,
-        parameters,
-        initiatedBy,
-        reason,
-        userOverride
-      })
-    );
+  res,
+  AIEngine.beginSpatialAction({
+    sessionId,
+    action,
+    parameters,
+    initiatedBy,
+    reason,
+    userOverride
+  })
+);
   } catch (err) {
     console.error('[WM-SPATIAL] Spatial action preparation failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
-
 router.post('/spatial/complete', (req, res) => {
   console.log('[WM-SPATIAL] POST /api/ai/spatial/complete');
   try {
@@ -170,7 +169,6 @@ router.post('/spatial/complete', (req, res) => {
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
-
 router.post('/introduction/begin', (req, res) => {
   console.log('[WM-INTRODUCTION] POST /api/ai/introduction/begin');
   try {
@@ -188,17 +186,26 @@ router.post('/introduction/begin', (req, res) => {
 router.post('/introduction/complete', (req, res) => {
   console.log('[WM-INTRODUCTION] POST /api/ai/introduction/complete');
   try {
-    const { sessionId, turnId, reply } = req.body || {};
-    return sendResult(res, AIEngine.completeIntroduction({
-      sessionId,
-      turnId,
-      reply
-    }));
-  } catch (err) {
-    console.error('[WM-INTRODUCTION] Introduction completion failed:', err);
-    return res.status(500).json({ ok: false, error: err.message });
-  }
-});
+    const { sessionId, turnId, reply, actionChoice = null } = req.body || {};
+
+    return sendResult(
+      res,
+      AIEngine.completeChat({
+        sessionId,
+        turnId,
+        reply,
+        actionChoice
+      })
+    );
+        sessionId,
+        turnId,
+        reply
+      }));
+    } catch (err) {
+      console.error('[WM-INTRODUCTION] Introduction completion failed:', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
 
 router.post('/chat/begin', async (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/begin');
@@ -243,16 +250,8 @@ router.post('/chat/begin', async (req, res) => {
 router.post('/chat/complete', (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/complete');
   try {
-    const { sessionId, turnId, reply, actionChoice = null } = req.body || {};
-    return sendResult(
-      res,
-      AIEngine.completeChat({
-        sessionId,
-        turnId,
-        reply,
-        actionChoice
-      })
-    );
+    const { sessionId, turnId, reply } = req.body || {};
+    return sendResult(res, AIEngine.completeChat({ sessionId, turnId, reply }));
   } catch (err) {
     console.error('[WM-CHAT] Chat completion failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
