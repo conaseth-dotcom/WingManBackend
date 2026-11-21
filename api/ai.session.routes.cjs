@@ -1,12 +1,10 @@
 /* ========================================================================
    WingMan Backend File
-
    Alias: @backend-api/ai.session.routes.cjs
    Role: HTTP interface for backend-authoritative, transport-neutral AI
          admission, orientation, persistence verification, chat, status,
          and disconnect operations.
-========================================================================= */
-
+======================================================================== */
 'use strict';
 
 const express = require('express');
@@ -21,6 +19,7 @@ function sendResult(res, result, successStatus = 200) {
       result || { ok: false, error: 'The AI operation returned no result.' }
     );
   }
+
   return res.status(successStatus).json(result);
 }
 
@@ -29,6 +28,7 @@ router.post('/invite', async (req, res) => {
 
   try {
     const aiStartup = req.app.locals.aiStartup;
+
     if (!aiStartup || typeof aiStartup.startAIOnboarding !== 'function') {
       return res.status(503).json({
         ok: false,
@@ -45,8 +45,10 @@ router.post('/invite', async (req, res) => {
     } = req.body || {};
 
     const license = await verifyLicense(productRef);
+
     if (license.authorized !== true) {
       const statusCode = license.serviceReachable ? 403 : 503;
+
       return res.status(statusCode).json({
         ok: false,
         authorized: false,
@@ -134,6 +136,7 @@ router.get('/session/:sessionId/status', (req, res) => {
 
 router.post('/spatial/begin', (req, res) => {
   console.log('[WM-SPATIAL] POST /api/ai/spatial/begin');
+
   try {
     const {
       sessionId,
@@ -143,40 +146,48 @@ router.post('/spatial/begin', (req, res) => {
       reason,
       userOverride
     } = req.body || {};
+
     return sendResult(
-  res,
-  AIEngine.beginSpatialAction({
-    sessionId,
-    action,
-    parameters,
-    initiatedBy,
-    reason,
-    userOverride
-  })
-);
+      res,
+      AIEngine.beginSpatialAction({
+        sessionId,
+        action,
+        parameters,
+        initiatedBy,
+        reason,
+        userOverride
+      })
+    );
   } catch (err) {
     console.error('[WM-SPATIAL] Spatial action preparation failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 router.post('/spatial/complete', (req, res) => {
   console.log('[WM-SPATIAL] POST /api/ai/spatial/complete');
+
   try {
     const { sessionId, actionId, result } = req.body || {};
-    return sendResult(res, AIEngine.completeSpatialAction({ sessionId, actionId, result }));
+    return sendResult(
+      res,
+      AIEngine.completeSpatialAction({ sessionId, actionId, result })
+    );
   } catch (err) {
     console.error('[WM-SPATIAL] Spatial action completion failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
+
 router.post('/introduction/begin', (req, res) => {
   console.log('[WM-INTRODUCTION] POST /api/ai/introduction/begin');
+
   try {
     const { sessionId, preferredName } = req.body || {};
-    return sendResult(res, AIEngine.beginIntroduction({
-      sessionId,
-      preferredName
-    }));
+    return sendResult(
+      res,
+      AIEngine.beginIntroduction({ sessionId, preferredName })
+    );
   } catch (err) {
     console.error('[WM-INTRODUCTION] Introduction preparation failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -185,8 +196,14 @@ router.post('/introduction/begin', (req, res) => {
 
 router.post('/introduction/complete', (req, res) => {
   console.log('[WM-INTRODUCTION] POST /api/ai/introduction/complete');
+
   try {
-    const { sessionId, turnId, reply, actionChoice = null } = req.body || {};
+    const {
+      sessionId,
+      turnId,
+      reply,
+      actionChoice = null
+    } = req.body || {};
 
     return sendResult(
       res,
@@ -197,18 +214,18 @@ router.post('/introduction/complete', (req, res) => {
         actionChoice
       })
     );
-        sessionId,
-        turnId,
-        reply
-      }));
-    } catch (err) {
-      console.error('[WM-INTRODUCTION] Introduction completion failed:', err);
-      return res.status(500).json({ ok: false, error: err.message });
-    }
-  });
+  } catch (err) {
+    console.error(
+      '[WM-INTRODUCTION] Introduction completion failed:',
+      err
+    );
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 router.post('/chat/begin', async (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/begin');
+
   try {
     const { sessionId, message } = req.body || {};
     const sessionStatus = AIEngine.status({ sessionId });
@@ -218,6 +235,7 @@ router.post('/chat/begin', async (req, res) => {
     }
 
     const productRef = sessionStatus.license?.productRef;
+
     if (!productRef) {
       return res.status(403).json({
         ok: false,
@@ -228,8 +246,10 @@ router.post('/chat/begin', async (req, res) => {
     }
 
     const license = await verifyLicense(productRef);
+
     if (license.authorized !== true) {
       const statusCode = license.serviceReachable ? 403 : 503;
+
       return res.status(statusCode).json({
         ok: false,
         authorized: false,
@@ -249,9 +269,13 @@ router.post('/chat/begin', async (req, res) => {
 
 router.post('/chat/complete', (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/complete');
+
   try {
     const { sessionId, turnId, reply } = req.body || {};
-    return sendResult(res, AIEngine.completeChat({ sessionId, turnId, reply }));
+    return sendResult(
+      res,
+      AIEngine.completeChat({ sessionId, turnId, reply })
+    );
   } catch (err) {
     console.error('[WM-CHAT] Chat completion failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -260,9 +284,13 @@ router.post('/chat/complete', (req, res) => {
 
 router.post('/turn/fail', (req, res) => {
   console.log('[WM-AI] POST /api/ai/turn/fail');
+
   try {
     const { sessionId, turnId, error } = req.body || {};
-    return sendResult(res, AIEngine.failPendingTurn({ sessionId, turnId, error }));
+    return sendResult(
+      res,
+      AIEngine.failPendingTurn({ sessionId, turnId, error })
+    );
   } catch (err) {
     console.error('[WM-AI] Pending-turn failure handling failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -271,6 +299,7 @@ router.post('/turn/fail', (req, res) => {
 
 router.post('/disconnect', (req, res) => {
   console.log('[WM-AI] POST /api/ai/disconnect');
+
   try {
     const { sessionId } = req.body || {};
     return sendResult(res, AIEngine.disconnect({ sessionId }));
