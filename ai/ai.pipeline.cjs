@@ -1037,7 +1037,14 @@ function beginChat({ sessionId, message } = {}) {
     provider: session.provider,
     model: session.model,
     params: clone(session.params),
-    messages: buildConversationMessages(session, userMessage)
+    messages: buildConversationMessages(session, userMessage),
+    optionalActions: [
+      {
+        name: SPATIAL_ACTIONS.ENTER_3D,
+        description: 'Enter the WingMan three-dimensional environment.',
+        parameters: {}
+      }
+    ]
   };
 
   session.pendingTurn = {
