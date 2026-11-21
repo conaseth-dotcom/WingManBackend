@@ -263,7 +263,14 @@ router.post('/chat/begin', async (req, res) => {
       });
     }
 
-    return sendResult(res, AIEngine.beginChat({ sessionId, message }));
+    return sendResult(
+      res,
+      AIEngine.beginChat({
+        sessionId,
+        message,
+        availableActions
+      })
+    );
   } catch (err) {
     console.error('[WM-CHAT] Chat preparation failed:', err);
     return res.status(500).json({ ok: false, error: err.message });
