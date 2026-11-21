@@ -207,11 +207,10 @@ router.post('/introduction/complete', (req, res) => {
 
     return sendResult(
       res,
-      AIEngine.completeChat({
+      AIEngine.completeIntroduction({
         sessionId,
         turnId,
-        reply,
-        actionChoice
+        reply
       })
     );
   } catch (err) {
