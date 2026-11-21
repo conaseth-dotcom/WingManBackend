@@ -1037,7 +1037,12 @@ function completeIntroduction({ sessionId, turnId, reply } = {}) {
   };
 }
 
-function beginChat({ sessionId, message } = {}) {
+function beginChat({
+  sessionId,
+  message,
+  availableActions = []
+} = {}) {
+
   const lookup = getRequiredSession(sessionId);
   if (!lookup.ok) return lookup;
   const { session, sessionId: normalizedSessionId } = lookup;
@@ -1067,6 +1072,24 @@ function beginChat({ sessionId, message } = {}) {
 
   const turnId = randomUUID();
   const startedAt = Date.now();
+  const normalizedAvailableActions = Array.isArray(availableActions)
+  ? availableActions
+      .filter((action) =>
+        isPlainObject(action) &&
+        typeof action.name === 'string' &&
+        action.name.trim()
+      )
+      .map((action) => ({
+        name: action.name.trim(),
+        description:
+          typeof action.description === 'string'
+            ? action.description.trim()
+            : '',
+        parameters: isPlainObject(action.parameters)
+          ? clone(action.parameters)
+          : {}
+      }))
+  : [];
   const operation = {
     type: 'chat_turn',
     turnId,
@@ -1080,9 +1103,10 @@ function beginChat({ sessionId, message } = {}) {
         name: SPATIAL_ACTIONS.ENTER_3D,
         description: 'Enter the WingMan three-dimensional environment.',
         parameters: {}
-      }
+      },
+      ...normalizedAvailableActions
     ]
-  };
+      };
 
   session.pendingTurn = {
     id: turnId,
