@@ -226,7 +226,11 @@ router.post('/chat/begin', async (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/begin');
 
   try {
-    const { sessionId, message } = req.body || {};
+    const {
+      sessionId,
+      message,
+      availableActions = []
+    } = req.body || {};
     const sessionStatus = AIEngine.status({ sessionId });
 
     if (!sessionStatus || sessionStatus.ok !== true) {

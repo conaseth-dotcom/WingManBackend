@@ -1163,14 +1163,6 @@ function completeChat({ sessionId, turnId, reply, actionChoice = null } = {}) {
       ts: completedAt
     });
   }
-
-if (fullReply) {
-  session.log.push({
-    role: 'assistant',
-    content: fullReply,
-    ts: completedAt
-  });
-}
   session.pendingTurn = null;
   session.state = 'ready';
 
