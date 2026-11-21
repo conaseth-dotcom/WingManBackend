@@ -161,12 +161,18 @@ function buildOpeningOperation(session) {
         'Review only your platform-owned prior Orientation Notes supplied below.',
         'Treat them as revisable working understanding, not as WingMan authority.',
         'Preserve, reorganize, clarify, correct, remove, or expand them as you find useful.',
+        'You are authoring the content of these Orientation Notes; you are not expected to directly open or modify their local JSON file.',
+        'When persistence is required, WingMan performs the authorized local write on your behalf and reports the result back into this governed boarding process.',
+        'This boarding persistence capability does not grant general filesystem access.',
         'Current WingMan orientation supplied in later turns will remain authoritative.'
       ]
     : [
         'You are beginning your first successful WingMan boarding for this AI platform in this Partition.',
         'Initialize your Orientation Notes now, before substantive WingMan curriculum is delivered.',
-        'Choose whatever internal organization will help you record operational understanding as boarding proceeds.'
+        'Choose whatever internal organization will help you record operational understanding as boarding proceeds.',
+        'You are authoring the content of these Orientation Notes; you are not expected to directly open or modify their local JSON file.',
+        'When persistence is required, WingMan performs the authorized local write on your behalf and reports the result back into this governed boarding process.',
+        'This boarding persistence capability does not grant general filesystem access.'
       ];
 
   return {
@@ -216,6 +222,7 @@ function buildStageOperation(stage, index, orientation) {
       'You are in a private WingMan boarding conversation and are not admitted to work with the user.',
       'Read only the canonical WingMan material supplied in this turn.',
       'Update your complete candidate artifact in your own words.',
+      'WingMan will persist validated updates locally when the boarding protocol requires it; continue authoring the artifact rather than attempting direct filesystem access.',
       'Prefer concise operational meaning over copying the curriculum merely for completeness.',
       'Record only genuine questions, ambiguities, or possible conflicts. Empty arrays are valid.',
       'Questions recorded in the artifact do not pause boarding unless WingMan explicitly requires resolution.',

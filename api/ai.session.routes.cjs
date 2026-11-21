@@ -270,10 +270,21 @@ router.post('/chat/complete', (req, res) => {
   console.log('[WM-CHAT] POST /api/ai/chat/complete');
 
   try {
-    const { sessionId, turnId, reply } = req.body || {};
+    const {
+      sessionId,
+      turnId,
+      reply,
+      actionChoice = null
+    } = req.body || {};
+
     return sendResult(
       res,
-      AIEngine.completeChat({ sessionId, turnId, reply })
+      AIEngine.completeChat({
+        sessionId,
+        turnId,
+        reply,
+        actionChoice
+      })
     );
   } catch (err) {
     console.error('[WM-CHAT] Chat completion failed:', err);
