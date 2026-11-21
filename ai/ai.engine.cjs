@@ -160,11 +160,22 @@ function beginChat({
     return { ok: false, error: err.message };
   }
 }
-function completeChat({ sessionId, turnId, reply } = {}) {
+function completeChat({
+  sessionId,
+  turnId,
+  reply,
+  actionChoice = null
+} = {}) {
   try {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    return AIPipeline.completeChat({ sessionId: validated.sessionId, turnId, reply });
+
+    return AIPipeline.completeChat({
+      sessionId: validated.sessionId,
+      turnId,
+      reply,
+      actionChoice
+    });
   } catch (err) {
     console.error('[AIEngine] completeChat failed:', err);
     return { ok: false, error: err.message };
