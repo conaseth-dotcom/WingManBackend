@@ -77,7 +77,44 @@ function normalizeSpatialAction(action) {
 function normalizeSpatialReason(reason) {
   return typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
 }
+function normalizeOptionalActionChoice(actionChoice, offeredActions = []) {
+  if (actionChoice === null || actionChoice === undefined) {
+    return null;
+  }
 
+  if (!isPlainObject(actionChoice)) {
+    throw new Error('The provider returned an invalid optional action choice.');
+  }
+
+  const name =
+    typeof actionChoice.name === 'string'
+      ? actionChoice.name.trim()
+      : '';
+
+  const offeredNames = new Set(
+    offeredActions
+      .filter((action) => isPlainObject(action))
+      .map((action) =>
+        typeof action.name === 'string' ? action.name.trim() : ''
+      )
+      .filter(Boolean)
+  );
+
+  if (!name || !offeredNames.has(name)) {
+    throw new Error(
+      `The provider selected an action that was not offered: ${name || '<missing>'}`
+    );
+  }
+
+  const parameters = isPlainObject(actionChoice.parameters)
+    ? clone(actionChoice.parameters)
+    : {};
+
+  return {
+    name,
+    parameters
+  };
+}
 function getRequiredSession(sessionId) {
   const normalizedSessionId = normalizeSessionId(sessionId);
   const session = sessions.get(normalizedSessionId);
@@ -1064,14 +1101,28 @@ function beginChat({ sessionId, message } = {}) {
   };
 }
 
-function completeChat({ sessionId, turnId, reply } = {}) {
+function completeChat({ sessionId, turnId, reply, actionChoice = null } = {}) {
   const lookup = getRequiredSession(sessionId);
   if (!lookup.ok) return lookup;
   const { session, sessionId: normalizedSessionId } = lookup;
   const pending = session.pendingTurn;
   const normalizedTurnId = typeof turnId === 'string' ? turnId.trim() : '';
   const fullReply = typeof reply === 'string' ? reply.trim() : '';
+  let normalizedActionChoice = null;
 
+  try {
+    normalizedActionChoice = normalizeOptionalActionChoice(
+      actionChoice,
+      pending?.operation?.optionalActions || []
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: err.message
+    };
+  }
   if (!pending || pending.type !== 'chat_turn') {
     return {
       ok: false,
@@ -1088,21 +1139,38 @@ function completeChat({ sessionId, turnId, reply } = {}) {
       error: 'The provider response does not match the pending chat turn.'
     };
   }
-  if (!fullReply) {
+  if (!fullReply && !normalizedActionChoice) {
     return {
       ok: false,
       sessionId: normalizedSessionId,
       state: session.state,
-      error: 'A non-empty provider reply is required.'
+      error: 'The provider response contained neither conversational text nor an optional action choice.'
     };
   }
 
   const completedAt = Date.now();
-  const latencyMs = completedAt - pending.createdAt;
-  session.log.push(
-    { role: 'user', content: pending.userMessage, ts: pending.createdAt },
-    { role: 'assistant', content: fullReply, ts: completedAt }
-  );
+  const latencyMs = completedAt - pending.createdAt;  
+  session.log.push({
+    role: 'user',
+    content: pending.userMessage,
+    ts: pending.createdAt
+  });
+
+  if (fullReply) {
+    session.log.push({
+      role: 'assistant',
+      content: fullReply,
+      ts: completedAt
+    });
+  }
+
+if (fullReply) {
+  session.log.push({
+    role: 'assistant',
+    content: fullReply,
+    ts: completedAt
+  });
+}
   session.pendingTurn = null;
   session.state = 'ready';
 
@@ -1113,6 +1181,7 @@ function completeChat({ sessionId, turnId, reply } = {}) {
     state: session.state,
     fullReply,
     reply: fullReply,
+    actionChoice: normalizedActionChoice,
     latencyMs
   };
 }
