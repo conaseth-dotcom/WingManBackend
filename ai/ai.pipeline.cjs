@@ -1102,11 +1102,15 @@ function beginChat({
       {
         name: SPATIAL_ACTIONS.ENTER_3D,
         description: 'Enter the WingMan three-dimensional environment.',
-        parameters: {}
+        parameters: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false
+        }
       },
       ...normalizedAvailableActions
     ]
-      };
+  };
 
   session.pendingTurn = {
     id: turnId,
@@ -1115,6 +1119,7 @@ function beginChat({
     createdAt: startedAt,
     operation
   };
+
   session.state = 'awaiting_provider_response';
 
   return {
