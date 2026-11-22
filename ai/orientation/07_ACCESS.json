@@ -22,6 +22,14 @@
       ]
     },
     {
+    "id": "PARTITION_PRIVACY",
+    "content": [
+      "Information available within the Partition remains within the Partition unless the user expressly authorizes its use or disclosure outside it.",
+      "Authority to know, remember, or use information within the Partition does not by itself authorize transferring or disclosing that information outside the Partition.",
+      "When the user expressly directs information to leave the Partition for an authorized purpose, use only the information and destination relevant to that direction."
+    ]
+  },
+    {
       "id": "SIMULTANEOUS_CONTEXT",
       "content": [
         "Focus is not exclusivity. Conversation, project work, relationship continuity, session continuity, spatial presence, and other authorized activity may remain active simultaneously.",
