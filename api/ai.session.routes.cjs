@@ -45,7 +45,13 @@ router.post('/invite', async (req, res) => {
     } = req.body || {};
 
     const license = await verifyLicense(productRef);
-
+        console.log("[WM-LICENSE] Verification result:", {
+          authorized: license.authorized,
+          reason: license.reason,
+          tier: license.tier,
+          serviceReachable: license.serviceReachable,
+          status: license.status
+        });
     if (license.authorized !== true) {
       const statusCode = license.serviceReachable ? 403 : 503;
 
