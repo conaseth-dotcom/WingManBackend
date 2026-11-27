@@ -2,614 +2,231 @@
 
 'use strict';
 
-(async () => {
-  console.log(">>> [WM-SERVER] BACKEND INSTANCE: server.cjs booting…");
+(() => {
+  const bootStartedAt = Date.now();
+
+  console.log('>>> [WM-SERVER] BACKEND INSTANCE: server.cjs booting...');
 
   const path = require('path');
   const http = require('http');
+  const fs = require('fs');
+  const EventEmitter = require('events');
+
   const express = require('express');
   const cors = require('cors');
   const helmet = require('helmet');
   const morgan = require('morgan');
   const compression = require('compression');
-  const EventEmitter = require('events');
-  const fs = require('fs');
 
-  // ─── Root + helpers ─────────────────────────────────────────────────────────
+  // --------------------------------------------------------------------------
+  // Root, environment, and helpers
+  // --------------------------------------------------------------------------
   const ROOT = path.resolve(__dirname);
-  const r = (...parts) => path.join(ROOT, ...parts);
+  const resolveFromRoot = (...parts) => path.join(ROOT, ...parts);
+  const PUBLIC_DIR = resolveFromRoot('public');
 
-  // Resolve the launcher-selected Partition for this backend session.
-  function resolveLauncherPartitionRoot() {
-    const appDataRoot = process.env.APPDATA;
+  require('dotenv').config({ path: resolveFromRoot('.env') });
 
-    if (!appDataRoot) {
-      console.warn(
-        "[PartitionDiscovery] APPDATA is unavailable. Launcher config cannot be resolved."
-      );
-      return null;
-    }
-
-    const launcherConfigPath = path.join(
-      appDataRoot,
-      "wingman-launcher",
-      "launcher.config.json"
-    );
-
-    if (!fs.existsSync(launcherConfigPath)) {
-      console.warn(
-        `[PartitionDiscovery] Launcher config not found: ${launcherConfigPath}`
-      );
-      return null;
-    }
-
-    let launcherConfig;
-
-    try {
-      const raw = fs.readFileSync(launcherConfigPath, "utf8");
-      launcherConfig = JSON.parse(raw);
-    } catch (err) {
-      throw new Error(
-        `Launcher config could not be read: ${err.message}`
-      );
-    }
-
-    const activePartitionId = launcherConfig.activePartitionId;
-
-    const activePartition = Array.isArray(launcherConfig.partitions)
-      ? launcherConfig.partitions.find(
-          partition => partition?.id === activePartitionId
-        )
-      : null;
-
-    const selectedPath =
-      activePartition?.path ||
-      launcherConfig.partitionPath ||
-      null;
-
-    if (!selectedPath || typeof selectedPath !== "string") {
-      throw new Error(
-        "Launcher config does not identify a valid active Partition path."
-      );
-    }
-
-    const resolvedPath = path.resolve(selectedPath);
-
-    if (!fs.existsSync(resolvedPath)) {
-      throw new Error(
-        `Launcher-selected Partition does not exist: ${resolvedPath}`
-      );
-    }
-
-    console.log(
-      `[PartitionDiscovery] Launcher config loaded: ${launcherConfigPath}`
-    );
-
-    console.log(
-      `[PartitionDiscovery] Active Partition ID: ${activePartitionId || "(not specified)"}`
-    );
-
-    console.log(
-      `[PartitionDiscovery] Active Partition path: ${resolvedPath}`
-    );
-
-    return resolvedPath;
+  function formatLog(level, message, metadata) {
+    const timestamp = new Date().toISOString();
+    const suffix = metadata === undefined ? '' : ` ${JSON.stringify(metadata)}`;
+    return `[${timestamp}] [${level.toUpperCase()}] ${message}${suffix}`;
   }
 
-  // DEBUG: show exactly what env file is being loaded
-  console.log("[WM-DEBUG] CWD:", process.cwd());
-  console.log("[WM-DEBUG] __dirname:", __dirname);
-  console.log("[WM-DEBUG] ENV PATH RESOLVED:", r('.env'));
+  const logger = Object.freeze({
+    info: (message, metadata) => console.log(formatLog('info', message, metadata)),
+    warn: (message, metadata) => console.warn(formatLog('warn', message, metadata)),
+    error: (message, metadata) => console.error(formatLog('error', message, metadata)),
+    debug: (message, metadata) => console.debug(formatLog('debug', message, metadata))
+  });
 
-  // Load the REAL .env file
-  require('dotenv').config({ path: path.resolve(__dirname, '.env') });
-  console.log("ENV LOADED:", process.env.ENV);
+  function loadConfig() {
+    try {
+      const loaded = require(resolveFromRoot('core', 'state.cjs'));
+      return loaded.default || loaded;
+    } catch (error) {
+      logger.warn('core/state.cjs unavailable; using environment fallback', {
+        error: error.message
+      });
 
-  console.log("[WM-SERVER] ROOT resolved:", ROOT);
+      return {
+        PORT: process.env.PORT || 4000,
+        HOST: process.env.HOST || '0.0.0.0',
+        ENV: process.env.NODE_ENV || process.env.ENV || 'production'
+      };
+    }
+  }
 
-  // ─── App + server ───────────────────────────────────────────────────────────
+  function readPublicJson(filename) {
+    const filePath = path.join(PUBLIC_DIR, filename);
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  }
+
+  const CONFIG = loadConfig();
+  const PORT = Number(process.env.PORT || CONFIG.PORT || 4000);
+  const HOST = process.env.HOST || CONFIG.HOST || '0.0.0.0';
+  const ENV = process.env.NODE_ENV || CONFIG.ENV || process.env.ENV || 'production';
+
+  if (!Number.isInteger(PORT) || PORT <= 0 || PORT > 65535) {
+    throw new Error(`Invalid server port: ${process.env.PORT || CONFIG.PORT}`);
+  }
+
+  // --------------------------------------------------------------------------
+  // App, server, and shared runtime objects
+  // --------------------------------------------------------------------------
   const app = express();
   const server = http.createServer(app);
 
-  console.log("[WM-SERVER] Express app + HTTP server created");
-
-  // ─── Event bus ──────────────────────────────────────────────────────────────
   class WingManEventBus extends EventEmitter {}
+
   const eventBus = new WingManEventBus();
   eventBus.setMaxListeners(100);
+
   app.locals.eventBus = eventBus;
-
-  console.log("[WM-SERVER] WingManEventBus initialised, maxListeners=100");
-
-  // ─── Logger ─────────────────────────────────────────────────────────────────
-  let logger;
-  try {
-    console.log("[WM-LOGGER] Attempting to load ai/lib/logger…");
-    logger = require(r('ai/lib/logger')).default || require(r('ai/lib/logger'));
-    console.log("[WM-LOGGER] ai/lib/logger loaded successfully");
-  } catch (e) {
-    console.log("[WM-LOGGER] ai/lib/logger unavailable, falling back to console logger:", e.message);
-    const ts = () => new Date().toISOString();
-    const fmt = (lvl, msg, meta) =>
-      `[${ts()}] [${lvl.toUpperCase()}] ${msg}${meta ? ' ' + JSON.stringify(meta) : ''}`;
-    logger = {
-      info: (m, x) => console.log(fmt('info', m, x)),
-      warn: (m, x) => console.warn(fmt('warn', m, x)),
-      error: (m, x) => console.error(fmt('error', m, x)),
-      debug: (m, x) => console.debug(fmt('debug', m, x)),
-    };
-  }
   app.locals.logger = logger;
-  logger.info('WingMan Orchestrator booting…');
+  app.locals.config = Object.freeze({ PORT, HOST, ENV });
+  app.locals.ready = false;
 
-  // ─── Config ─────────────────────────────────────────────────────────────────
-  const CONFIG = (() => {
-    try {
-      console.log("[WM-CONFIG] Attempting to load core/state…");
-      const mod = require(r('core/state.cjs'));
-      const cfg = mod.default || mod;
-      console.log("[WM-CONFIG] core/state loaded");
-      return cfg;
-    } catch (e) {
-      console.log("[WM-CONFIG] core/state unavailable, using ENV fallback:", e.message);
-      return {
-        PORT: parseInt(process.env.PORT || '4000', 10),
-        HOST: process.env.HOST || '0.0.0.0',
-        ENV: process.env.NODE_ENV || 'production',
-        PARTITION_ROOT: process.env.PARTITION_ROOT
-      };
-    }
-  })();
+  logger.info('WingMan Backend booting', { port: PORT, host: HOST, env: ENV });
 
-  app.locals.config = CONFIG;
-  logger.info('Config loaded', { port: CONFIG.PORT, env: CONFIG.ENV });
-  console.log("[WM-CONFIG] Effective config:", CONFIG);
-
-  // ─── Middleware ─────────────────────────────────────────────────────────────
-  console.log("[WM-MW] Registering middleware stack…");
+  // --------------------------------------------------------------------------
+  // Middleware
+  // --------------------------------------------------------------------------
+  app.disable('x-powered-by');
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: true, credentials: true }));
   app.use(compression());
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-  app.use(morgan(CONFIG.ENV === 'production' ? 'combined' : 'dev', {
-    stream: { write: msg => logger.info(msg.trim()) },
+  app.use(morgan(ENV === 'production' ? 'combined' : 'dev', {
+    stream: { write: message => logger.info(message.trim()) }
   }));
-  console.log("[WM-MW] Middleware stack registered");
 
-  // ─── Static file hosting for launcher ───────────────────────────────────────
-  app.use(express.static(path.join(__dirname, "public")));
-  app.get('/messages.json', (req, res) => {
-    res.sendFile(path.join(__dirname, "public", "messages.json"));
+  // --------------------------------------------------------------------------
+  // Public launcher/update assets
+  // --------------------------------------------------------------------------
+  app.use(express.static(PUBLIC_DIR));
+
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime() });
   });
 
-  console.log("[WM-STATIC] Static /public folder mounted");
+  app.get('/ready', (_req, res) => {
+    const ready = app.locals.ready === true;
+    res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'booting' });
+  });
 
-  // ─── Health / readiness ─────────────────────────────────────────────────────
-  app.locals.ready = false;
-  app.get('/health', (_req, res) =>
-    res.json({ status: 'ok', uptime: process.uptime() })
-  );
-  app.get('/ready', (_req, res) =>
-    res.json({ status: app.locals.ready ? 'ready' : 'booting' })
-  );
-  console.log("[WM-ROUTE] Health + readiness routes mounted");
-
-  // ─── Version route ──────────────────────────────────────────────────────────
-  app.get('/version', (req, res) => {
+  app.get('/version', (_req, res) => {
     try {
-      const versionData = require(path.join(__dirname, "public", "version.json"));
-      console.log("[WM-ROUTE] /version served:", versionData);
-      res.json(versionData);
-    } catch (err) {
-      console.error("[WM-ROUTE] /version failed:", err.message);
-      res.status(500).json({ error: "version.json missing or unreadable" });
+      res.json(readPublicJson('version.json'));
+    } catch (error) {
+      logger.error('Failed to serve version.json', { error: error.message });
+      res.status(500).json({ error: 'version.json missing or unreadable' });
     }
   });
-  console.log("[WM-ROUTE] Version route mounted");
 
-  // ─── Messages route ─────────────────────────────────────────────────────────
-  app.get('/api/messages', (req, res) => {
-    const filePath = path.join(__dirname, "public", "messages.json");
-
-    console.log("[WM-ROUTE] /api/messages requested");
+  app.get('/api/messages', (_req, res) => {
+    const filePath = path.join(PUBLIC_DIR, 'messages.json');
 
     if (!fs.existsSync(filePath)) {
-      console.error("[WM-ROUTE] messages.json missing:", filePath);
-      return res.status(404).json({ error: "messages.json not found" });
+      return res.status(404).json({ error: 'messages.json not found' });
     }
 
-    res.sendFile(filePath);
+    return res.sendFile(filePath);
   });
-  console.log("[WM-ROUTE] Messages route mounted");
 
-  // ─── WingMan UI Bundle Delivery ─────────────────────────────────────────────
-  app.get('/wingman-ui-bundle.zip', (req, res) => {
-    const bundlePath = path.join(__dirname, "public", "wingman-ui-bundle.zip");
-
-    console.log("[WM-ROUTE] /wingman-ui-bundle.zip requested");
+  app.get('/wingman-ui-bundle.zip', (_req, res) => {
+    const bundlePath = path.join(PUBLIC_DIR, 'wingman-ui-bundle.zip');
 
     if (!fs.existsSync(bundlePath)) {
-      console.error("[WM-ROUTE] UI bundle missing:", bundlePath);
-      return res.status(404).json({ error: "UI bundle not found" });
+      return res.status(404).json({ error: 'UI bundle not found' });
     }
 
-    res.sendFile(bundlePath);
-  });
-  console.log("[WM-ROUTE] UI bundle route mounted");
-
-  // ─── Orchestrator integrations ──────────────────────────────────────────────
-  const { migrateRoomToPartition } = require(r('core/rooms/rooms.to.partition.cjs'));
-  const { loadSystemMetadata } = require(r('core/system/system.metadata.loader.cjs'));
-
-  // ─── AI providers ───────────────────────────────────────────────────────────
-  logger.info('Phase — AI Stack…');
-  console.log("[WM-AI] Starting provider initialization sequence…");
-
-  const PROVIDERS = {};
-  const providerDefs = [
-    { key: 'openai', mod: 'providers/provider-openai' },
-    { key: 'anthropic', mod: 'providers/provider-anthropic' },
-    { key: 'gemini', mod: 'providers/provider-gemini' },
-    { key: 'deepseek', mod: 'providers/provider-deepseek' },
-    { key: 'lmstudio', mod: 'providers/provider-lmstudio' },
-    { key: 'ollama', mod: 'providers/provider-ollama' },
-    { key: 'custom', mod: 'providers/provider-custom' },
-  ];
-
-  for (const { key, mod } of providerDefs) {
-    console.log(`[WM-PROVIDER] Attempting to load provider: ${key} from ${mod}.cjs`);
-    try {
-      let provider = require(r(mod + '.cjs'));
-      provider = provider.default || provider;
-
-      PROVIDERS[key] = {
-        ...provider,
-        create: (apiKey, orgId, projectId) => {
-          if (typeof provider.createOpenAIProvider === "function") {
-            return provider.createOpenAIProvider(apiKey, orgId, projectId);
-          }
-          if (typeof provider.createProvider === "function") {
-            return provider.createProvider(apiKey, orgId, projectId);
-          }
-          if (typeof provider.create === "function") {
-            return provider.create(apiKey, orgId, projectId);
-          }
-          console.log(`[WM-PROVIDER] WARNING — Provider ${key} has no create() factory`);
-          throw new Error(`Provider ${key} does not implement a create() factory`);
-        }
-      };
-
-      logger.info(`Provider loaded: ${key}`);
-      console.log(`[WM-PROVIDER] Provider module loaded successfully: ${key}`);
-    } catch (e) {
-      logger.warn(`Provider [${key}] not found — skipped`, { err: e.message });
-      console.log(`[WM-PROVIDER] Provider load FAILED for: ${key}`, e.message);
-    }
-  }
-
-  app.locals.providers = PROVIDERS;
-  console.log("[WM-AI] Provider map initialised:", Object.keys(PROVIDERS));
-  
-  let personality;
-  
-  // Personality
-  console.log("[WM-AI] Loading ai.personality.cjs…");
-  try {
-    let mod = require(r('ai/ai.personality.cjs'));
-    personality = mod.default || mod;
-    if (typeof personality.init === 'function') {
-      console.log("[WM-AI] Initialising personality engine…");
-      const result = personality.init({ logger });
-      if (result instanceof Promise) await result;
-      console.log("[WM-AI] Personality init completed");
-    }
-    logger.info('Personality engine initialised');
-  } catch (e) {
-    logger.warn('Personality unavailable', { err: e.message });
-    console.log("[WM-AI] Personality unavailable:", e.message);
-  }
-
-  app.locals.ai = {
-    personality
-  };
-  console.log("[WM-AI] app.locals.ai populated");
-
-  // ─── Partition System (Full P1) ─────────────────────────────────────────────
-  console.log("[WM-PARTITION] Initialising partition system…");
-
-  let partitionManager;
-  let partitionFS, partitionPaths, partitionMerge,
-      partitionReview, partitionValidator, partitionSession, partitionStorage,
-      activePartitionGateway;
-
-  try {
-    partitionManager = require(r('partition/partition.manager.cjs'));
-  } catch (e) {
-    logger.warn('Partition Manager unavailable', { err: e.message });
-  }
-
-  try {
-    const launcherPartitionRoot = resolveLauncherPartitionRoot();
-
-    const ss = {
-      partitionRoot:
-        launcherPartitionRoot ||
-        CONFIG.PARTITION_ROOT ||
-        process.env.WINGMAN_PARTITION ||
-        "D:\\WingManPartition"
-    };
-
-    app.locals.systemSettings = app.locals.systemSettings || {};
-    app.locals.systemSettings.partitionRoot = ss.partitionRoot;
-
-    // Initialize canonical Partition paths before loading modules
-    // that may resolve Partition locations during import.
-    partitionPaths = require(r('partition/api/partition.paths.cjs'));
-    if (typeof partitionPaths.init === 'function') {
-      const result = partitionPaths.init({
-        logger,
-        systemSettings: app.locals.systemSettings
-      });
-
-      if (result instanceof Promise) await result;
-    }
-
-    partitionFS = require(r('partition/api/partition.fs.cjs'));
-    partitionMerge = require(r('partition/api/partition.merge.cjs'));
-    partitionReview = require(r('partition/api/partition.review.cjs'));
-    partitionValidator = require(r('partition/api/partition.validator.cjs'));
-    partitionSession = require(r('partition/api/partition.session.cjs'));
-    partitionStorage = require(r('partition/api/storage.cjs'));
-    activePartitionGateway = require(r('partition/api/active-partition.gateway.cjs'));
-
-    if (typeof partitionManager?.init === 'function') {
-      const result = partitionManager.init({
-        logger,
-        systemSettings: app.locals.systemSettings
-      });
-      if (result instanceof Promise) await result;
-    }
-
-    if (typeof partitionFS.init === 'function') {
-      const result = partitionFS.init({
-        logger,
-        systemSettings: app.locals.systemSettings
-      });
-      if (result instanceof Promise) await result;
-    }
-
-    if (typeof partitionStorage.init === 'function') {
-      const result = partitionStorage.init({
-        logger,
-        systemSettings: app.locals.systemSettings
-      });
-      if (result instanceof Promise) await result;
-    }
-
-    if (typeof partitionSession.init === 'function') {
-      const result = partitionSession.init({
-        logger,
-        systemSettings: app.locals.systemSettings
-      });
-      if (result instanceof Promise) await result;
-    }
-
-    if (typeof partitionValidator.init === 'function') {
-      const result = partitionValidator.init({
-        logger,
-        systemSettings: app.locals.systemSettings
-      });
-      if (result instanceof Promise) await result;
-    }
-
-    logger.info('Partition System loaded');
-    console.log("[WM-PARTITION] Partition System loaded");
-  } catch (e) {
-    logger.warn('Partition System partial/unavailable', { err: e.message });
-    console.log("[WM-PARTITION] Partition System partial/unavailable:", e.message);
-  }
-
-  app.locals.partition = {
-    manager: partitionManager,
-    fs: partitionFS,
-    paths: partitionPaths,
-    merge: partitionMerge,
-    review: partitionReview,
-    validator: partitionValidator,
-    session: partitionSession,
-    storage: partitionStorage,
-    gateway: activePartitionGateway
-  };
-
-  // ─── Load System Metadata ───────────────────────────────────────────────────
-  console.log("[WM-SYSTEM] Loading system metadata…");
-  try {
-    const sysMeta = loadSystemMetadata(
-      CONFIG.PARTITION_ROOT || process.env.WINGMAN_PARTITION,
-      logger
-    );
-
-    app.locals.systemMetadata = sysMeta;
-
-    if (sysMeta.ok) {
-      logger.info("[WM-SYSTEM] System metadata loaded");
-      console.log("[WM-SYSTEM] System metadata loaded successfully");
-    } else {
-      logger.warn("[WM-SYSTEM] System metadata loaded with warnings/errors");
-      console.log("[WM-SYSTEM] System metadata loaded with warnings/errors:", sysMeta.errors);
-    }
-  } catch (e) {
-    logger.error("[WM-SYSTEM] Failed to load system metadata", { err: e.message });
-    console.log("[WM-SYSTEM] ERROR — Failed to load system metadata:", e.message);
-  }
-
-  // ─── AI onboarding (lazy) ───────────────────────────────────────────────────
-  let aiStartup;
-  console.log("[WM-AI] Loading ai.startup.cjs…");
-  try {
-    aiStartup = require(r('ai/ai.startup.cjs'));
-    app.locals.aiStartup = aiStartup;
-    logger.info('AI Startup orchestrator registered (lazy mode)');
-    console.log("[WM-AI] AI Startup orchestrator registered (lazy mode)");
-  } catch (e) {
-    logger.warn('AI Startup orchestrator unavailable', { err: e.message });
-    console.log("[WM-AI] AI Startup orchestrator unavailable:", e.message);
-  }
-
-  // ─── Route helper ───────────────────────────────────────────────────────────
-  function safeMount(mountPath, mod, label) {
-    console.log(`[WM-ROUTE] Attempting to mount route: ${mountPath} (${label})`);
-    if (!mod) {
-      console.log(`[WM-ROUTE] Skipped mount: ${mountPath} (${label}) — module is null/undefined`);
-      return;
-    }
-    try {
-      const router = mod.router || mod.default || mod;
-      if (typeof router === 'function') {
-        app.use(mountPath, router);
-        logger.info(`Route mounted: ${mountPath}  [${label}]`);
-        console.log(`[WM-ROUTE] Route mounted successfully: ${mountPath} (${label})`);
-      } else {
-        console.log(`[WM-ROUTE] Module for ${mountPath} (${label}) is not a router function`);
-      }
-    } catch (e) {
-      logger.warn(`Route mount failed: ${mountPath} [${label}]`, { err: e.message });
-      console.log(`[WM-ROUTE] Route mount FAILED: ${mountPath} (${label})`, e.message);
-    }
-  }
-
-  // ─── Settings API ───────────────────────────────────────────────────────────
-  try {
-    console.log("[WM-API] Loading api/settings.cjs…");
-    const settingsAPI = require(r('api/settings.cjs'));
-    safeMount('/api/settings', settingsAPI, 'settings-api');
-  } catch (e) {
-    logger.warn('Settings API unavailable', { err: e.message });
-    console.log("[WM-API] Settings API unavailable:", e.message);
-  }
-
-  // ─── Voice Profile API ──────────────────────────────────────────────────────
-  try {
-    console.log("[WM-API] Loading api/voiceProfile.cjs…");
-    const voiceProfileAPI = require(r('api/voiceProfile.cjs'));
-    safeMount('/api/voice-profile', voiceProfileAPI, 'voice-profile-api');
-  } catch (e) {
-    logger.warn('Voice Profile API unavailable', { err: e.message });
-    console.log("[WM-API] Voice Profile API unavailable:", e.message);
-  }
-
-  // Providers API
-  try {
-    console.log("[WM-API] Loading api/providers.cjs…");
-    const providersAPI = require(r('api/providers.cjs'));
-    safeMount('/api/providers', providersAPI, 'providers-api');
-  } catch (e) {
-    logger.warn('Providers API unavailable', { err: e.message });
-    console.log("[WM-API] Providers API unavailable:", e.message);
-  }
-
-  // ─── License authorization route ────────────────────────────────────────────
-  try {
-    console.log("[WM-LICENSE] Loading protected license route…");
-    const licenseProtectedRoutes = require(r('api/license.protected.routes.cjs'));
-    safeMount('/api/license', licenseProtectedRoutes, 'license-protected-api');
-  } catch (e) {
-    logger.error('Protected license route unavailable', { err: e.message });
-    console.log("[WM-LICENSE] Protected license route unavailable:", e.message);
-  }
-     // ─── AI routes ──────────────────────────────────────────────────────────────
-     
-     //  Transport-neutral, backend-authoritative AI session API
-    console.log("[WM-AI] Mounting governed AI session routes...");
-    try {
-      const aiSessionRoutes = require(r('api/ai.session.routes.cjs'));
-      app.use('/api/ai', aiSessionRoutes);
-
-      logger.info('Governed AI session routes mounted');
-      console.log("[WM-AI] Governed AI session routes mounted at /api/ai");
-    } catch (e) {
-      logger.error('Governed AI session routes unavailable', { err: e.message });
-      console.log("[WM-AI] Governed AI session routes FAILED:", e.message);
-    }
-
-  // Rooms → Partition migration route
-  console.log("[WM-ROOMS] Registering /api/rooms/migrate route…");
-  app.post('/api/rooms/migrate', async (req, res) => {
-    console.log("[WM-ROOMS] /api/rooms/migrate invoked");
-    try {
-      const { roomName } = req.body;
-      if (!roomName) {
-        console.log("[WM-ROOMS] ERROR — roomName missing in request body");
-        return res.json({ ok: false, error: "roomName is required" });
-      }
-
-      console.log("[WM-ROOMS] Calling migrateRoomToPartition…", roomName);
-      const result = migrateRoomToPartition(roomName);
-      console.log("[WM-ROOMS] migrateRoomToPartition returned:", result);
-
-      logger.info('Room migrated to partition', { roomName, target: result.partition });
-
-      res.json(result);
-    } catch (err) {
-      console.log("[WM-ROOMS] ERROR — migrateRoomToPartition threw:", err);
-      logger.error('[Rooms-Migrate] Error during migration', { err: err.message });
-      res.json({ ok: false, error: err.message });
-    }
+    return res.sendFile(bundlePath);
   });
 
-  // ─── Launcher Config Bundle ─────────────────────────────────────────────────
-  console.log("[WM-ROUTE] Registering /api/launcher/config route…");
-  app.get('/api/launcher/config', (req, res) => {
+  app.get('/api/launcher/config', (_req, res) => {
     try {
-      const base = path.join(__dirname, "public");
-
-      const manifest = JSON.parse(fs.readFileSync(path.join(base, "manifest.json"), "utf8"));
-      const messages = JSON.parse(fs.readFileSync(path.join(base, "messages.json"), "utf8"));
-      const version = JSON.parse(fs.readFileSync(path.join(base, "version.json"), "utf8"));
-      const maintenance = JSON.parse(fs.readFileSync(path.join(base, "maintenance.json"), "utf8"));
-      const urlMap = JSON.parse(fs.readFileSync(path.join(base, "backend_URL_map.json"), "utf8"));
-
       res.json({
         ok: true,
-        manifest,
-        messages,
-        version,
-        maintenance,
-        urlMap
+        manifest: readPublicJson('manifest.json'),
+        messages: readPublicJson('messages.json'),
+        version: readPublicJson('version.json'),
+        maintenance: readPublicJson('maintenance.json'),
+        urlMap: readPublicJson('backend_URL_map.json')
       });
-    } catch (err) {
-      console.error("[WM-ROUTE] /api/launcher/config failed:", err.message);
-      res.status(500).json({ ok: false, error: err.message });
+    } catch (error) {
+      logger.error('Failed to assemble launcher configuration', {
+        error: error.message
+      });
+      res.status(500).json({ ok: false, error: error.message });
     }
   });
-  console.log("[WM-ROUTE] Launcher config bundle route mounted");
 
-  // ─── Final bind ─────────────────────────────────────────────────────────────
-  const BOOT_END = Date.now();
-  const bootMs = BOOT_END - (global.BOOT_START || BOOT_END);
+  // --------------------------------------------------------------------------
+  // Runtime modules and API routes
+  // --------------------------------------------------------------------------
+  function loadRequiredModule(relativePath, label) {
+    try {
+      return require(resolveFromRoot(...relativePath.split('/')));
+    } catch (error) {
+      logger.error(`${label} unavailable`, { error: error.message });
+      throw error;
+    }
+  }
 
-  logger.info('WingMan Backend ready', {
-    port: process.env.PORT || CONFIG.PORT,
-    env: CONFIG.ENV,
-    bootMs
-  });
-  console.log("[WM-SERVER] Backend ready:", {
-    port: process.env.PORT || CONFIG.PORT,
-    env: CONFIG.ENV,
-    bootMs
-  });
+  function mountRouter(mountPath, moduleValue, label) {
+    const router = moduleValue?.router || moduleValue?.default || moduleValue;
 
+    if (typeof router !== 'function') {
+      throw new TypeError(`${label} does not export an Express router function`);
+    }
+
+    app.use(mountPath, router);
+    logger.info('Route mounted', { mountPath, label });
+  }
+
+  const aiStartup = loadRequiredModule('ai/ai.startup.cjs', 'AI startup orchestrator');
+  app.locals.aiStartup = aiStartup;
+
+  const licenseRoutes = loadRequiredModule(
+    'api/license.protected.routes.cjs',
+    'Protected license routes'
+  );
+  mountRouter('/api/license', licenseRoutes, 'license-protected-api');
+
+  const aiSessionRoutes = loadRequiredModule(
+    'api/ai.session.routes.cjs',
+    'Governed AI session routes'
+  );
+  mountRouter('/api/ai', aiSessionRoutes, 'governed-ai-session-api');
+
+  // --------------------------------------------------------------------------
+  // Final bind and lifecycle
+  // --------------------------------------------------------------------------
   app.locals.ready = true;
 
-  // Render MUST use process.env.PORT — no fallback to 10000
-  const PORT = process.env.PORT || CONFIG.PORT;
-  const HOST = "0.0.0.0";
-
   server.listen(PORT, HOST, () => {
-    logger.info(`HTTP server listening on http://${HOST}:${PORT}`);
-    console.log(`[WM-SERVER] HTTP server listening on http://${HOST}:${PORT}`);
+    logger.info('WingMan Backend ready', {
+      port: PORT,
+      host: HOST,
+      env: ENV,
+      bootMs: Date.now() - bootStartedAt
+    });
   });
 
-  // WM-BACKEND: heartbeat marker for redeploy
+  function shutdown(signal) {
+    logger.info('Shutdown requested', { signal });
+    app.locals.ready = false;
+
+    server.close(error => {
+      if (error) {
+        logger.error('HTTP server shutdown failed', { error: error.message });
+        process.exitCode = 1;
+      }
+    });
+  }
+
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
 })();

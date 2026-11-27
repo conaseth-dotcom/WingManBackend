@@ -1,33 +1,24 @@
 /* ========================================================================
-   WingMan Backend - Active Partition Gateway (V1)
+   WingMan Backend - Active Partition Gateway (V2)
    Path: partition/api/active-partition.gateway.cjs
 
    Role:
-     Provide an authorized AI session with a stable, governed doorway into
-     the already-resolved active WingMan Partition without exposing host
-     filesystem paths or permitting host filesystem discovery.
-
-   V1 scope:
-     - activate({ sessionId })
-     - status({ sessionId })
-     - deactivate({ sessionId })
-     - internal Partition-relative path confinement
-     - NO filesystem reads/writes/moves/deletes yet
+     Maintain the backend-side logical ACTIVE_PARTITION capability for an
+     authorized AI session using only the stable Partition identity supplied
+     by local WingMan.
 
    Authority boundary:
-     This gateway governs resources already inside the active Partition.
-     External retrieval, downloads, host-side search, community artifacts,
-     and other content crossing into the Partition are outside this
-     gateway's authority and must use WingMan's governed intake boundary.
+     - Backend owns capability policy and session admission state.
+     - Local WingMan owns physical Partition paths and filesystem operations.
+     - This gateway never discovers, resolves, reads, writes, moves, deletes,
+       or otherwise accesses host filesystem paths.
+     - External retrieval/import/export uses a separately governed intake
+       boundary.
 ========================================================================= */
-
 'use strict';
 
-const path = require('path');
-const PartitionPaths = require('./partition.paths.cjs');
-
 const CAPABILITY = 'ACTIVE_PARTITION';
-const V1_OPERATIONS = Object.freeze(['status']);
+const V2_OPERATIONS = Object.freeze(['status']);
 const activeSessions = new Map();
 
 function failure(code, error, details = undefined) {
@@ -40,86 +31,40 @@ function failure(code, error, details = undefined) {
   };
 }
 
-function requireSessionId(sessionId) {
-  if (typeof sessionId !== 'string' || !sessionId.trim()) {
+function normalizeSessionId(sessionId) {
+  return typeof sessionId === 'string' ? sessionId.trim() : '';
+}
+
+function normalizePartitionId(partitionId) {
+  return typeof partitionId === 'string' ? partitionId.trim() : '';
+}
+
+function activate({ sessionId, partitionId } = {}) {
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  if (!normalizedSessionId) {
     return failure('INVALID_SESSION', 'A valid WingMan AI sessionId is required.');
   }
-  return null;
-}
 
-function getActivePartitionRoot() {
-  const root = PartitionPaths.getPartitionRoot();
-  if (typeof root !== 'string' || !root.trim()) {
-    throw new Error('The active Partition has not been initialized.');
-  }
-  return path.resolve(root);
-}
-
-function resolvePartitionPath(relativePath) {
-  if (typeof relativePath !== 'string') {
-    return failure('INVALID_PARTITION_PATH', 'Partition paths must be relative strings.');
-  }
-
-  const requested = relativePath.trim();
-  if (!requested || requested === '.') {
-    return failure('INVALID_PARTITION_PATH', 'A non-empty Partition-relative path is required.');
-  }
-
-  if (
-    path.isAbsolute(requested) ||
-    /^[A-Za-z]:[\\/]/.test(requested) ||
-    /^\\\\/.test(requested) ||
-    /^\/\//.test(requested)
-  ) {
+  const normalizedPartitionId = normalizePartitionId(partitionId);
+  if (!normalizedPartitionId) {
     return failure(
-      'PARTITION_BOUNDARY_VIOLATION',
-      'Absolute host paths are not accepted by ACTIVE_PARTITION.'
+      'INVALID_PARTITION',
+      'A stable active Partition identity is required.'
     );
   }
 
-  let root;
-  try {
-    root = getActivePartitionRoot();
-  } catch (err) {
-    return failure('PARTITION_UNAVAILABLE', err.message);
-  }
-
-  const target = path.resolve(root, requested);
-  const relativeToRoot = path.relative(root, target);
-  const escaped =
-    relativeToRoot === '..' ||
-    relativeToRoot.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relativeToRoot);
-
-  if (escaped) {
+  const existing = activeSessions.get(normalizedSessionId);
+  if (existing && existing.partitionId !== normalizedPartitionId) {
     return failure(
-      'PARTITION_BOUNDARY_VIOLATION',
-      'The requested path is outside the active Partition.'
+      'PARTITION_IDENTITY_MISMATCH',
+      'The AI session is already bound to a different active Partition.'
     );
   }
 
-  return {
-    ok: true,
-    root,
-    target,
-    relativePath: relativeToRoot
-  };
-}
-
-function activate({ sessionId } = {}) {
-  const sessionError = requireSessionId(sessionId);
-  if (sessionError) return sessionError;
-
-  try {
-    getActivePartitionRoot();
-  } catch (err) {
-    return failure('PARTITION_UNAVAILABLE', err.message);
-  }
-
-  const normalizedSessionId = sessionId.trim();
-  if (!activeSessions.has(normalizedSessionId)) {
+  if (!existing) {
     activeSessions.set(normalizedSessionId, {
       sessionId: normalizedSessionId,
+      partitionId: normalizedPartitionId,
       activatedAt: new Date().toISOString()
     });
   }
@@ -129,17 +74,21 @@ function activate({ sessionId } = {}) {
     capability: CAPABILITY,
     state: 'active',
     active: true,
+    available: true,
     sessionId: normalizedSessionId,
-    operations: [...V1_OPERATIONS]
+    partitionId: normalizedPartitionId,
+    operations: [...V2_OPERATIONS]
   };
 }
 
 function status({ sessionId } = {}) {
-  const sessionError = requireSessionId(sessionId);
-  if (sessionError) return sessionError;
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  if (!normalizedSessionId) {
+    return failure('INVALID_SESSION', 'A valid WingMan AI sessionId is required.');
+  }
 
-  const normalizedSessionId = sessionId.trim();
-  if (!activeSessions.has(normalizedSessionId)) {
+  const session = activeSessions.get(normalizedSessionId);
+  if (!session) {
     return {
       ok: true,
       capability: CAPABILITY,
@@ -150,12 +99,6 @@ function status({ sessionId } = {}) {
     };
   }
 
-  try {
-    getActivePartitionRoot();
-  } catch (err) {
-    return failure('PARTITION_UNAVAILABLE', err.message);
-  }
-
   return {
     ok: true,
     capability: CAPABILITY,
@@ -163,39 +106,39 @@ function status({ sessionId } = {}) {
     available: true,
     state: 'active',
     sessionId: normalizedSessionId,
-    operations: [...V1_OPERATIONS]
+    partitionId: session.partitionId,
+    operations: [...V2_OPERATIONS]
   };
 }
 
 function deactivate({ sessionId } = {}) {
-  const sessionError = requireSessionId(sessionId);
-  if (sessionError) return sessionError;
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  if (!normalizedSessionId) {
+    return failure('INVALID_SESSION', 'A valid WingMan AI sessionId is required.');
+  }
 
-  const normalizedSessionId = sessionId.trim();
+  const previous = activeSessions.get(normalizedSessionId) || null;
   const existed = activeSessions.delete(normalizedSessionId);
 
   return {
     ok: true,
     capability: CAPABILITY,
     active: false,
+    available: false,
     state: 'inactive',
     sessionId: normalizedSessionId,
+    partitionId: previous?.partitionId || null,
     deactivated: existed
   };
 }
 
-module.exports = {
+module.exports = Object.freeze({
   activate,
   status,
   deactivate,
-
-  ActivePartitionGateway: {
+  ActivePartitionGateway: Object.freeze({
     activate,
     status,
     deactivate
-  },
-
-  _internal: {
-    resolvePartitionPath
-  }
-};
+  })
+});

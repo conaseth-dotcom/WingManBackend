@@ -1,11 +1,11 @@
-﻿{
+{
   "name": "wingman-backend",
   "version": "1.0.0",
   "type": "module",
-  "main": "BlackBox/main.cjs",
+  "main": "server.cjs",
   "scripts": {
     "postinstall": "node ./render-postinstall.cjs",
-    "start": "node BlackBox/main.cjs"
+    "start": "node server.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

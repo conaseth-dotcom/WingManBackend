@@ -1,148 +1,135 @@
 /* ========================================================================
    WingMan Backend File
    Alias: @backend-ai/ai.engine.cjs
-   Role: Authoritative persistent-session facade for the WingMan AI pipeline.
+   Role: Persistent-session facade for the WingMan AI pipeline.
 ========================================================================= */
 'use strict';
+
 const AIPipeline = require('./ai.pipeline.cjs');
 const sessionLicenses = new Map();
+
 function requireSessionId(sessionId) {
   const normalizedSessionId =
     typeof sessionId === 'string' ? sessionId.trim() : '';
+
   if (!normalizedSessionId) {
     return { ok: false, error: 'A valid AI sessionId is required.' };
   }
+
   return { ok: true, sessionId: normalizedSessionId };
 }
+
+function run(name, operation) {
+  try {
+    return operation();
+  } catch (err) {
+    console.error(`[AIEngine] ${name} failed:`, err);
+    return { ok: false, error: err.message };
+  }
+}
+
 function connect({
   licenseContext,
   provider = 'openai',
   model,
   params = {},
-  localBoardingContext
+  localContext
 } = {}) {
-  try {
+  return run('connect', () => {
+    if (!licenseContext?.productRef) {
+      return { ok: false, error: 'Verified license context is required.' };
+    }
+
     const result = AIPipeline.connect({
       provider,
       model,
       params,
-      localBoardingContext
+      localContext
     });
+
     if (!result || result.ok !== true) {
       return {
         ok: false,
         error: result?.error || 'The AI pipeline did not create a session.'
       };
     }
-    if (!licenseContext?.productRef) {
-      AIPipeline.disconnect({ sessionId: result.sessionId });
-      return { ok: false, error: 'Verified license context is required.' };
-    }
-    sessionLicenses.set(result.sessionId, Object.freeze({
+
+    const license = Object.freeze({
       productRef: String(licenseContext.productRef).trim(),
       tier: licenseContext.tier || null,
       verifiedAt: licenseContext.verifiedAt || new Date().toISOString()
-    }));
-    return { ...result, license: sessionLicenses.get(result.sessionId) };
-  } catch (err) {
-    console.error('[AIEngine] connect failed:', err);
-    return { ok: false, error: err.message };
-  }
-}
-function advanceOrientation({ sessionId, response } = {}) {
-  try {
-    const validated = requireSessionId(sessionId);
-    if (!validated.ok) return validated;
-    return AIPipeline.advanceOrientation({ sessionId: validated.sessionId, response });
-  } catch (err) {
-    console.error('[AIEngine] advanceOrientation failed:', err);
-    return { ok: false, error: err.message };
-  }
-}
-function submitPersistenceResult({ sessionId, persistenceType, result } = {}) {
-  try {
-    const validated = requireSessionId(sessionId);
-    if (!validated.ok) return validated;
-    return AIPipeline.submitPersistenceResult({
-      sessionId: validated.sessionId,
-      persistenceType,
-      result
     });
-  } catch (err) {
-    console.error('[AIEngine] submitPersistenceResult failed:', err);
-    return { ok: false, error: err.message };
-  }
+
+    if (!license.productRef) {
+      AIPipeline.disconnect({ sessionId: result.sessionId });
+      return { ok: false, error: 'Verified license context is required.' };
+    }
+
+    sessionLicenses.set(result.sessionId, license);
+    return { ...result, license };
+  });
 }
-function currentOperation({ sessionId } = {}) {
-  try {
-    const validated = requireSessionId(sessionId);
-    if (!validated.ok) return validated;
-    return AIPipeline.currentOperation({ sessionId: validated.sessionId });
-  } catch (err) {
-    console.error('[AIEngine] currentOperation failed:', err);
-    return { ok: false, error: err.message };
-  }
-}
-function beginSpatialAction({
-  sessionId,
-  action,
-  parameters = {},
-  initiatedBy,
-  reason,
-  userOverride
-} = {}) {
-  try {
-    const validated = requireSessionId(sessionId);
+
+function beginSpatialAction(args = {}) {
+  return run('beginSpatialAction', () => {
+    const validated = requireSessionId(args.sessionId);
     if (!validated.ok) return validated;
     return AIPipeline.beginSpatialAction({
-      sessionId: validated.sessionId,
-      action,
-      parameters,
-      initiatedBy,
-      reason,
-      userOverride
+      ...args,
+      sessionId: validated.sessionId
     });
-  } catch (err) {
-    console.error('[AIEngine] beginSpatialAction failed:', err);
-    return { ok: false, error: err.message };
-  }
+  });
 }
+
 function completeSpatialAction({ sessionId, actionId, result } = {}) {
-  try {
+  return run('completeSpatialAction', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    return AIPipeline.completeSpatialAction({ sessionId: validated.sessionId, actionId, result });
-  } catch (err) {
-    console.error('[AIEngine] completeSpatialAction failed:', err);
-    return { ok: false, error: err.message };
-  }
+    return AIPipeline.completeSpatialAction({
+      sessionId: validated.sessionId,
+      actionId,
+      result
+    });
+  });
 }
+
+function failSpatialAction({ sessionId, actionId, error } = {}) {
+  return run('failSpatialAction', () => {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+    return AIPipeline.failSpatialAction({
+      sessionId: validated.sessionId,
+      actionId,
+      error
+    });
+  });
+}
+
 function beginIntroduction({ sessionId, preferredName } = {}) {
-  try {
+  return run('beginIntroduction', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    return AIPipeline.beginIntroduction({ sessionId: validated.sessionId, preferredName });
-  } catch (err) {
-    console.error('[AIEngine] beginIntroduction failed:', err);
-    return { ok: false, error: err.message };
-  }
+    return AIPipeline.beginIntroduction({
+      sessionId: validated.sessionId,
+      preferredName
+    });
+  });
 }
+
 function completeIntroduction({ sessionId, turnId, reply } = {}) {
-  try {
+  return run('completeIntroduction', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    return AIPipeline.completeIntroduction({ sessionId: validated.sessionId, turnId, reply });
-  } catch (err) {
-    console.error('[AIEngine] completeIntroduction failed:', err);
-    return { ok: false, error: err.message };
-  }
+    return AIPipeline.completeIntroduction({
+      sessionId: validated.sessionId,
+      turnId,
+      reply
+    });
+  });
 }
-function beginChat({
-  sessionId,
-  message,
-  availableActions = []
-} = {}) {
-  try {
+
+function beginChat({ sessionId, message, availableActions = [] } = {}) {
+  return run('beginChat', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
 
@@ -155,18 +142,16 @@ function beginChat({
       message: message.trim(),
       availableActions
     });
-  } catch (err) {
-    console.error('[AIEngine] beginChat failed:', err);
-    return { ok: false, error: err.message };
-  }
+  });
 }
+
 function completeChat({
   sessionId,
   turnId,
   reply,
   actionChoice = null
 } = {}) {
-  try {
+  return run('completeChat', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
 
@@ -176,78 +161,99 @@ function completeChat({
       reply,
       actionChoice
     });
-  } catch (err) {
-    console.error('[AIEngine] completeChat failed:', err);
-    return { ok: false, error: err.message };
-  }
+  });
 }
+
 function failPendingTurn({ sessionId, turnId, error } = {}) {
-  try {
+  return run('failPendingTurn', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    return AIPipeline.failPendingTurn({ sessionId: validated.sessionId, turnId, error });
-  } catch (err) {
-    console.error('[AIEngine] failPendingTurn failed:', err);
-    return { ok: false, error: err.message };
-  }
+    return AIPipeline.failPendingTurn({
+      sessionId: validated.sessionId,
+      turnId,
+      error
+    });
+  });
 }
-function status({ sessionId } = {}) {
-  try {
+
+function setActiveProject({ sessionId, project } = {}) {
+  return run('setActiveProject', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
+    return AIPipeline.setActiveProject({
+      sessionId: validated.sessionId,
+      project
+    });
+  });
+}
+
+function status({ sessionId } = {}) {
+  return run('status', () => {
+    const validated = requireSessionId(sessionId);
+    if (!validated.ok) return validated;
+
     const session = AIPipeline.getSession(validated.sessionId);
     if (!session) {
-      return { ok: true, active: false, admitted: false, sessionId: validated.sessionId, state: 'disconnected' };
+      return {
+        ok: true,
+        active: false,
+        admitted: false,
+        sessionId: validated.sessionId,
+        state: 'disconnected'
+      };
     }
-    const admitted =
-      session.state === 'ready_for_introduction' ||
-      session.state === 'ready' ||
-      session.state === 'awaiting_provider_response';
+
+    const admitted = Boolean(session.admission?.readyForIntroduction);
+    const active = admitted && session.state !== 'disconnecting';
+
     return {
       ok: true,
-      active: admitted,
+      active,
       admitted,
       sessionId: session.id,
       provider: session.provider,
       model: session.model,
       state: session.state,
-      boardingMode: session.boardingMode,
       partitionId: session.partitionId,
-      orientation: session.orientation,
       activePartition: session.activePartition || null,
+      activeProject: session.governance?.activeProject || null,
+      governance: session.governance || null,
+      admission: session.admission || null,
       pendingTurn: session.pendingTurn || null,
+      pendingSpatialAction: session.pendingSpatialAction || null,
       startedAt: session.startedAt,
+      readyAt: session.readyAt,
+      admissionDurationMs: session.admissionDurationMs,
+      configVersion: session.configVersion,
       license: sessionLicenses.get(session.id) || null
     };
-  } catch (err) {
-    console.error('[AIEngine] status failed:', err);
-    return { ok: false, error: err.message };
-  }
+  });
 }
+
 function disconnect({ sessionId } = {}) {
-  try {
+  return run('disconnect', () => {
     const validated = requireSessionId(sessionId);
     if (!validated.ok) return validated;
-    const result = AIPipeline.disconnect({ sessionId: validated.sessionId });
+
+    const result = AIPipeline.disconnect({
+      sessionId: validated.sessionId
+    });
     sessionLicenses.delete(validated.sessionId);
     return result;
-  } catch (err) {
-    console.error('[AIEngine] disconnect failed:', err);
-    return { ok: false, error: err.message };
-  }
+  });
 }
-module.exports = {
+
+module.exports = Object.freeze({
   connect,
-  advanceOrientation,
-  submitPersistenceResult,
-  currentOperation,
   beginSpatialAction,
   completeSpatialAction,
+  failSpatialAction,
   beginIntroduction,
   completeIntroduction,
   beginChat,
   completeChat,
   failPendingTurn,
+  setActiveProject,
   status,
   disconnect
-};
+});

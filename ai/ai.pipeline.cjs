@@ -1,51 +1,39 @@
 /* ========================================================================
    WingMan Backend File
-
    Alias: @backend-ai/ai.pipeline.cjs
    Role: Authoritative, transport-neutral backend AI session pipeline.
-========================================================================= */
 
+   Governance model:
+     - WingMan owns and enforces environmental boundaries.
+     - The user owns objectives, project authority, and relationship choices.
+     - The AI owns design and implementation only inside current authority.
+     - Backend runtime state is authoritative; AI-facing instructions describe
+       that state but never replace backend enforcement.
+========================================================================= */
 'use strict';
 
 const { randomUUID } = require('crypto');
-const {
-  beginOrientation,
-  getCurrentOrientationOperation,
-  submitOrientationResponse,
-  getOrientationStatus
-} = require('./orientation/ai.orientation.cjs');
-const {
-  BOARDING_MODES,
-  BOARDING_STATUSES,
-  createBoardingRecord,
-  createPlatformContinuityRecord,
-  selectBoardingMode,
-  validateCandidateArtifact,
-  validatePlatformContinuityRecord,
-  markAdmission,
-  markReadyForIntroduction,
-  markParticipantReady,
-  completeBoarding,
-  markSuccessfulContinuity,
-  setBoardingStatus
-} = require('./orientation/boarding.record.cjs');
 const ActivePartitionGateway = require('../partition/api/active-partition.gateway.cjs');
+const { createFunctionRuntimeState } = require('./governance/function.runtime-state.cjs');
+const { buildGovernanceInstructions } = require('./governance/governance.instructions.cjs');
 
-const PERSIST_BOARDING_SNAPSHOT = 'persist_boarding_snapshot';
-const PERSIST_ORIENTATION_NOTES = 'persist_orientation_notes';
-const PERSIST_PLATFORM_CONTINUITY = 'persist_platform_continuity';
 const SPATIAL_ACTION = 'spatial_action';
-const SPATIAL_ACTIONS = Object.freeze({ ENTER_3D: 'enter_3d', LEAVE_3D: 'leave_3d' });
-
-const PERSISTENCE_PHASES = Object.freeze({
-  ORIENTATION_CHECKPOINT: 'orientation_checkpoint',
-  FINAL_ORIENTATION_NOTES: 'final_orientation_notes',
-  PRE_INTRODUCTION_ADMISSION: 'pre_introduction_admission',
-  COMPLETED_BOARDING: 'completed_boarding',
-  PLATFORM_CONTINUITY: 'platform_continuity'
+const SPATIAL_ACTIONS = Object.freeze({
+  ENTER_3D: 'enter_3d',
+  LEAVE_3D: 'leave_3d'
 });
 
+const PIPELINE_VERSION = '4.0.0';
 const sessions = new Map();
+
+function clone(value) {
+  if (value === undefined) return undefined;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
 
 function normalizeProvider(provider) {
   const value = String(provider || '').trim().toLowerCase();
@@ -67,36 +55,92 @@ function defaultModel(provider) {
 function normalizeSessionId(sessionId) {
   return typeof sessionId === 'string' ? sessionId.trim() : '';
 }
+
+function requirePartitionId(value) {
+  const partitionId = typeof value === 'string' ? value.trim() : '';
+  if (!partitionId) {
+    throw new Error('Local AI context must identify the active Partition.');
+  }
+  return partitionId;
+}
+
+function normalizeLocalContext(value) {
+  if (!isPlainObject(value)) {
+    throw new Error('A valid localContext object is required.');
+  }
+
+  const partitionId = requirePartitionId(value.partitionId);
+  const activeProject = value.activeProject == null
+    ? null
+    : normalizeProject(value.activeProject);
+
+  return { partitionId, activeProject };
+}
+
+function normalizeProject(project) {
+  if (!isPlainObject(project) || !String(project.id || '').trim()) {
+    throw new Error('An active project requires a stable project id.');
+  }
+
+  return Object.freeze({
+    id: String(project.id).trim(),
+    name: typeof project.name === 'string' && project.name.trim()
+      ? project.name.trim()
+      : null
+  });
+}
+
+function getRequiredSession(sessionId) {
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  const session = sessions.get(normalizedSessionId);
+
+  if (!session) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      error: `Session not found: ${normalizedSessionId}`
+    };
+  }
+
+  return { ok: true, sessionId: normalizedSessionId, session };
+}
+
+function normalizePreferredName(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ').slice(0, 80);
+}
+
 function normalizeSpatialAction(action) {
-  const normalized = typeof action === 'string' ? action.trim().toLowerCase() : '';
+  const normalized = typeof action === 'string'
+    ? action.trim().toLowerCase()
+    : '';
+
   if (!Object.values(SPATIAL_ACTIONS).includes(normalized)) {
     throw new Error(`Unsupported spatial action: ${normalized || '<missing>'}`);
   }
+
   return normalized;
 }
+
 function normalizeSpatialReason(reason) {
   return typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
 }
+
 function normalizeOptionalActionChoice(actionChoice, offeredActions = []) {
-  if (actionChoice === null || actionChoice === undefined) {
-    return null;
-  }
+  if (actionChoice === null || actionChoice === undefined) return null;
 
   if (!isPlainObject(actionChoice)) {
     throw new Error('The provider returned an invalid optional action choice.');
   }
 
-  const name =
-    typeof actionChoice.name === 'string'
-      ? actionChoice.name.trim()
-      : '';
+  const name = typeof actionChoice.name === 'string'
+    ? actionChoice.name.trim()
+    : '';
 
   const offeredNames = new Set(
     offeredActions
-      .filter((action) => isPlainObject(action))
-      .map((action) =>
-        typeof action.name === 'string' ? action.name.trim() : ''
-      )
+      .filter(isPlainObject)
+      .map((action) => typeof action.name === 'string' ? action.name.trim() : '')
       .filter(Boolean)
   );
 
@@ -106,281 +150,21 @@ function normalizeOptionalActionChoice(actionChoice, offeredActions = []) {
     );
   }
 
-  const parameters = isPlainObject(actionChoice.parameters)
-    ? clone(actionChoice.parameters)
-    : {};
-
   return {
     name,
-    parameters
+    parameters: isPlainObject(actionChoice.parameters)
+      ? clone(actionChoice.parameters)
+      : {}
   };
-}
-function getRequiredSession(sessionId) {
-  const normalizedSessionId = normalizeSessionId(sessionId);
-  const session = sessions.get(normalizedSessionId);
-  if (!session) {
-    return {
-      ok: false,
-      sessionId: normalizedSessionId,
-      error: `Session not found: ${normalizedSessionId}`
-    };
-  }
-  return { ok: true, sessionId: normalizedSessionId, session };
-}
-
-function clone(value) {
-  if (value === undefined) return undefined;
-  return JSON.parse(JSON.stringify(value));
-}
-
-function isPlainObject(value) {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
-
-function requirePartitionId(value) {
-  const partitionId = typeof value === 'string' ? value.trim() : '';
-  if (!partitionId) {
-    throw new Error('Local boarding context must identify the active Partition.');
-  }
-  return partitionId;
-}
-
-function normalizeLocalBoardingContext(value, provider, model) {
-  if (!isPlainObject(value)) {
-    throw new Error('A valid localBoardingContext object is required.');
-  }
-
-  const partitionId = requirePartitionId(value.partitionId);
-  const suppliedContinuity = value.platformContinuity ?? null;
-  const suppliedNotes = value.orientationNotes ?? null;
-
-  let platformContinuity;
-  if (suppliedContinuity === null) {
-    platformContinuity = createPlatformContinuityRecord({
-      platform: provider,
-      partitionId,
-      model
-    });
-  } else {
-    validatePlatformContinuityRecord(suppliedContinuity, {
-      platform: provider,
-      partitionId
-    });
-    platformContinuity = clone(suppliedContinuity);
-  }
-
-  const boardingMode = selectBoardingMode({
-    platform: provider,
-    partitionId,
-    continuityRecord: platformContinuity
-  });
-
-  if (boardingMode === BOARDING_MODES.FIRST && suppliedNotes !== null) {
-    throw new Error('First boarding cannot receive prior Orientation Notes.');
-  }
-  if (boardingMode === BOARDING_MODES.RETURNING && suppliedNotes === null) {
-    throw new Error("Returning boarding requires this platform's prior Orientation Notes.");
-  }
-
-  const priorOrientationNotes = suppliedNotes === null
-    ? null
-    : validateCandidateArtifact(suppliedNotes);
-
-  return {
-    partitionId,
-    boardingMode,
-    platformContinuity,
-    priorOrientationNotes
-  };
-}
-
-function publicOrientation(session) {
-  if (!session.orientation) return null;
-  return getOrientationStatus(session);
-}
-
-function publicSession(session) {
-  return {
-    id: session.id,
-    provider: session.provider,
-    model: session.model,
-    params: clone(session.params),
-    state: session.state,
-    boardingMode: session.boardingMode,
-    partitionId: session.partitionId,
-    boardingRecord: session.boardingRecord
-      ? {
-          status: session.boardingRecord.boarding.status,
-          currentStep: session.boardingRecord.boarding.currentStep,
-          lastCompletedStep: session.boardingRecord.boarding.lastCompletedStep,
-          admission: clone(session.boardingRecord.admission)
-        }
-      : null,
-    orientation: publicOrientation(session),
-    activePartition: session.activePartition
-      ? {
-          ...session.activePartition,
-          operations: [...session.activePartition.operations]
-        }
-      : null,
-    persistence: {
-      orientationNotesPath: session.orientationNotesPath || null,
-      preIntroductionBoardingRecordPath:
-        session.preIntroductionBoardingRecordPath || null,
-      completedBoardingRecordPath:
-        session.completedBoardingRecordPath || null,
-      platformContinuityPath: session.platformContinuityPath || null,
-      pendingType: session.pendingPersistence?.type || null,
-      pendingPhase: session.pendingPersistence?.phase || null
-    },
-    pendingTurn: session.pendingTurn
-      ? {
-          id: session.pendingTurn.id,
-          type: session.pendingTurn.type,
-          createdAt: session.pendingTurn.createdAt
-        }
-      : null,
-    pendingSpatialAction: session.pendingSpatialAction
-      ? {
-          id: session.pendingSpatialAction.id,
-          action: session.pendingSpatialAction.action,
-          initiatedBy: session.pendingSpatialAction.initiatedBy,
-          reason: session.pendingSpatialAction.reason,
-          createdAt: session.pendingSpatialAction.createdAt
-        }
-      : null,
-    startedAt: session.startedAt,
-    configVersion: session.configVersion,
-    log: session.log.map(entry => ({ ...entry }))
-  };
-}
-
-function buildOperationalSystemMessage(session) {
-  const partitionState = session.activePartition?.state || 'unavailable';
-  return [
-    'You are participating in an active WingMan collaborative session.',
-    'You completed the governed WingMan orientation required for this session.',
-    'Continue to follow the authority, privacy, capability, and Partition boundaries established by that orientation.',
-    `ACTIVE_PARTITION state: ${partitionState}.`,
-    'Do not infer access from knowledge alone.',
-    'Do not claim that unavailable capabilities or resources are available.',
-    'Treat messages in this conversation as user communication unless WingMan explicitly identifies a different source.'
-  ].join('\n');
-}
-
-function buildConversationMessages(session, userMessage) {
-  return [
-    { role: 'system', content: buildOperationalSystemMessage(session) },
-    ...session.log.map(({ role, content }) => ({ role, content })),
-    { role: 'user', content: userMessage }
-  ];
-}
-
-function normalizePreferredName(value) {
-  if (typeof value !== 'string') return '';
-  return value.trim().replace(/\s+/g, ' ').slice(0, 80);
-}
-
-function buildIntroductionMessages(session, preferredName) {
-  const nameInstruction = preferredName
-    ? `The user's preferred name is ${JSON.stringify(preferredName)}. Address the user by that name.`
-    : 'The user has not supplied a preferred name. Introduce yourself without inventing one.';
-
-  return [
-    {
-      role: 'system',
-      content: [
-        buildOperationalSystemMessage(session),
-        'WingMan has admitted you as the AI participant.',
-        'This is your first direct introduction to the user.',
-        nameInstruction,
-        'Introduce yourself naturally and briefly.',
-        'Do not output JSON, discuss the boarding process in detail, or pretend the user already spoke.'
-      ].join('\n')
-    }
-  ];
-}
-
-function buildBoardingSnapshotOperation(session, phase, completedStepId = null) {
-  return {
-    type: PERSIST_BOARDING_SNAPSHOT,
-    persistenceType: PERSIST_BOARDING_SNAPSHOT,
-    persistencePhase: phase,
-    sessionId: session.id,
-    platform: session.provider,
-    partitionId: session.partitionId,
-    completedStepId,
-    record: clone(session.boardingRecord)
-  };
-}
-
-function buildOrientationNotesOperation(session) {
-  return {
-    type: PERSIST_ORIENTATION_NOTES,
-    persistenceType: PERSIST_ORIENTATION_NOTES,
-    persistencePhase: PERSISTENCE_PHASES.FINAL_ORIENTATION_NOTES,
-    sessionId: session.id,
-    platform: session.provider,
-    partitionId: session.partitionId,
-    recordVersion: '1.0.0',
-    record: clone(session.boardingRecord.candidate)
-  };
-}
-
-function buildPlatformContinuityOperation(session) {
-  return {
-    type: PERSIST_PLATFORM_CONTINUITY,
-    persistenceType: PERSIST_PLATFORM_CONTINUITY,
-    persistencePhase: PERSISTENCE_PHASES.PLATFORM_CONTINUITY,
-    sessionId: session.id,
-    platform: session.provider,
-    partitionId: session.partitionId,
-    record: clone(session.platformContinuity)
-  };
-}
-
-function setPendingPersistence(session, {
-  type,
-  phase,
-  operation,
-  completedStepId = null
-}) {
-  session.pendingPersistence = {
-    type,
-    phase,
-    completedStepId,
-    createdAt: Date.now(),
-    operation: clone(operation),
-    error: null
-  };
-  return clone(operation);
-}
-
-function beginFinalOrientationNotesPersistence(session) {
-  validateCandidateArtifact(session.boardingRecord.candidate);
-  markAdmission(session.boardingRecord, 'orientationValidated', true);
-  setBoardingStatus(session.boardingRecord, BOARDING_STATUSES.PERSISTING_NOTES, {
-    currentStep: 'PERSIST_ORIENTATION_NOTES',
-    detail: 'Final candidate Orientation Notes validated; local persistence required.'
-  });
-
-  session.state = 'persisting_orientation_notes';
-  const operation = buildOrientationNotesOperation(session);
-  return setPendingPersistence(session, {
-    type: PERSIST_ORIENTATION_NOTES,
-    phase: PERSISTENCE_PHASES.FINAL_ORIENTATION_NOTES,
-    operation
-  });
 }
 
 function activatePartition(session) {
   session.state = 'activating_partition';
-  setBoardingStatus(session.boardingRecord, BOARDING_STATUSES.ACTIVATING_PARTITION, {
-    currentStep: 'ACTIVATE_ACTIVE_PARTITION',
-    detail: 'Verified Orientation Notes persisted; activating ACTIVE_PARTITION.'
-  });
 
-  const partitionAccess = ActivePartitionGateway.activate({ sessionId: session.id });
+  const partitionAccess = ActivePartitionGateway.activate({
+    sessionId: session.id,
+    partitionId: session.partitionId
+  });
 
   if (!partitionAccess || partitionAccess.ok !== true) {
     session.state = 'partition_access_failed';
@@ -397,73 +181,87 @@ function activatePartition(session) {
       : []
   };
 
-  markAdmission(session.boardingRecord, 'activePartitionActivated', true);
-  console.log(`[ai.pipeline] ACTIVE_PARTITION activated: ${session.id}`);
   return session.activePartition;
 }
 
-function beginPreIntroductionAdmissionPersistence(session) {
-  markReadyForIntroduction(session.boardingRecord);
-  session.state = 'persisting_pre_introduction_admission';
+function governanceSnapshot(session) {
+  return {
+    activeProject: clone(session.governance.getActiveProject()),
+    functions: session.governance.listFunctionStates().map(clone),
+    instructionsGeneratedAt: Date.now()
+  };
+}
 
-  const operation = buildBoardingSnapshotOperation(
-    session,
-    PERSISTENCE_PHASES.PRE_INTRODUCTION_ADMISSION,
-    session.boardingRecord.boarding.lastCompletedStep
-  );
-
-  return setPendingPersistence(session, {
-    type: PERSIST_BOARDING_SNAPSHOT,
-    phase: PERSISTENCE_PHASES.PRE_INTRODUCTION_ADMISSION,
-    operation,
-    completedStepId: session.boardingRecord.boarding.lastCompletedStep
+function buildOperationalSystemMessage(session) {
+  return buildGovernanceInstructions(session.governance, {
+    heading: 'WINGMAN OPERATING PRINCIPLES'
   });
 }
 
-function buildPipelineResult(session, {
-  ok = true,
-  active = false,
-  admitted = false,
-  complete = false,
-  persistenceType = null,
-  verified = false,
-  path = null,
-  operation = null,
-  error = null
-} = {}) {
-  const result = {
-    ok,
-    active,
-    admitted,
-    complete,
-    sessionId: session.id,
+function buildConversationMessages(session, userMessage) {
+  return [
+    { role: 'system', content: buildOperationalSystemMessage(session) },
+    ...session.log.map(({ role, content }) => ({ role, content })),
+    { role: 'user', content: userMessage }
+  ];
+}
+
+function buildIntroductionMessages(session, preferredName) {
+  const nameInstruction = preferredName
+    ? `The user's preferred name is ${JSON.stringify(preferredName)}. Address the user by that name.`
+    : 'The user has not supplied a preferred name. Introduce yourself without inventing one.';
+
+  return [
+    {
+      role: 'system',
+      content: [
+        buildOperationalSystemMessage(session),
+        'WingMan has admitted you as the AI participant.',
+        'This is your first direct introduction to the user.',
+        nameInstruction,
+        'Introduce yourself naturally and briefly.',
+        'Do not discuss internal admission mechanics unless the user asks.'
+      ].join('\n')
+    }
+  ];
+}
+
+function publicSession(session) {
+  return {
+    id: session.id,
     provider: session.provider,
     model: session.model,
-    partitionId: session.partitionId,
-    boardingMode: session.boardingMode,
+    params: clone(session.params),
     state: session.state,
-    orientation: publicOrientation(session),
-    boardingRecord: {
-      status: session.boardingRecord.boarding.status,
-      currentStep: session.boardingRecord.boarding.currentStep,
-      lastCompletedStep: session.boardingRecord.boarding.lastCompletedStep,
-      admission: clone(session.boardingRecord.admission)
-    },
+    partitionId: session.partitionId,
     activePartition: session.activePartition
+      ? { ...session.activePartition, operations: [...session.activePartition.operations] }
+      : null,
+    governance: governanceSnapshot(session),
+    admission: clone(session.admission),
+    pendingTurn: session.pendingTurn
       ? {
-          ...session.activePartition,
-          operations: [...session.activePartition.operations]
+          id: session.pendingTurn.id,
+          type: session.pendingTurn.type,
+          createdAt: session.pendingTurn.createdAt
         }
       : null,
-    operation: clone(operation)
+    pendingSpatialAction: session.pendingSpatialAction
+      ? {
+          id: session.pendingSpatialAction.id,
+          action: session.pendingSpatialAction.action,
+          initiatedBy: session.pendingSpatialAction.initiatedBy,
+          reason: session.pendingSpatialAction.reason,
+          createdAt: session.pendingSpatialAction.createdAt
+        }
+      : null,
+    introductionReply: session.introductionReply,
+    startedAt: session.startedAt,
+    readyAt: session.readyAt,
+    admissionDurationMs: session.admissionDurationMs,
+    configVersion: session.configVersion,
+    log: session.log.map((entry) => ({ ...entry }))
   };
-
-  if (persistenceType) result.persistenceType = persistenceType;
-  if (verified) result.verified = true;
-  if (path) result.path = path;
-  if (error) result.error = error;
-
-  return result;
 }
 
 function connect(config = {}) {
@@ -471,436 +269,80 @@ function connect(config = {}) {
     provider = 'openai',
     model,
     params = {},
-    localBoardingContext
+    localContext
   } = config;
 
   const normalizedProvider = normalizeProvider(provider);
   const resolvedModel = model || defaultModel(normalizedProvider);
   const sessionId = randomUUID();
+  const startedAt = Date.now();
 
-  let normalizedContext;
+  let context;
   try {
-    normalizedContext = normalizeLocalBoardingContext(
-      localBoardingContext,
-      normalizedProvider,
-      resolvedModel
-    );
+    context = normalizeLocalContext(localContext);
   } catch (err) {
-    console.error('[ai.pipeline] local boarding context rejected:', err.message);
     return { ok: false, sessionId, error: err.message };
   }
+
+  const governance = createFunctionRuntimeState({
+    activeProject: context.activeProject
+  });
 
   const session = {
     id: sessionId,
     provider: normalizedProvider,
     model: resolvedModel,
-    params: params && typeof params === 'object' && !Array.isArray(params)
-      ? clone(params)
-      : {},
-    log: [],
-    state: 'admission_pending',
-    boardingMode: normalizedContext.boardingMode,
-    partitionId: normalizedContext.partitionId,
-    platformContinuity: normalizedContext.platformContinuity,
-    priorOrientationNotes: normalizedContext.priorOrientationNotes,
-    boardingRecord: createBoardingRecord({
-      sessionId,
-      platform: normalizedProvider,
-      model: resolvedModel,
-      partitionId: normalizedContext.partitionId,
-      mode: normalizedContext.boardingMode
-    }),
-    orientation: null,
+    params: isPlainObject(params) ? clone(params) : {},
+    partitionId: context.partitionId,
+    governance,
     activePartition: null,
     pendingTurn: null,
     pendingSpatialAction: null,
-    pendingPersistence: null,
-    orientationNotesPath: null,
-    preIntroductionBoardingRecordPath: null,
-    completedBoardingRecordPath: null,
-    platformContinuityPath: null,
     introductionReply: null,
-    startedAt: Date.now(),
-    configVersion: '3.4.0'
+    log: [],
+    state: 'admission_pending',
+    startedAt,
+    readyAt: null,
+    admissionDurationMs: null,
+    configVersion: PIPELINE_VERSION,
+    admission: {
+      governanceInitialized: false,
+      partitionActivated: false,
+      readyForIntroduction: false,
+      introductionComplete: false
+    }
   };
 
   try {
     sessions.set(sessionId, session);
-    console.log(
-      `[ai.pipeline] Candidate session created: ${sessionId} ` +
-      `(${normalizedProvider}/${resolvedModel || 'local-default'}, ` +
-      `${session.boardingMode} boarding, Partition ${session.partitionId})`
-    );
+    session.admission.governanceInitialized = true;
 
-    const orientation = beginOrientation(session, {
-      boardingMode: session.boardingMode,
-      priorOrientationNotes: clone(session.priorOrientationNotes),
-      onProgress(progress) {
-        console.log('[ai.pipeline] Orientation progress:', progress);
-      }
-    });
+    activatePartition(session);
+    session.admission.partitionActivated = true;
+
+    session.state = 'ready_for_introduction';
+    session.readyAt = Date.now();
+    session.admissionDurationMs = session.readyAt - startedAt;
+    session.admission.readyForIntroduction = true;
 
     return {
       ok: true,
-      active: false,
-      admitted: false,
+      active: true,
+      admitted: true,
       sessionId,
       provider: session.provider,
       model: session.model,
       partitionId: session.partitionId,
-      boardingMode: session.boardingMode,
       state: session.state,
-      orientation: orientation.orientation,
-      operation: orientation.operation
+      activePartition: clone(session.activePartition),
+      governance: governanceSnapshot(session),
+      governanceInstructions: buildOperationalSystemMessage(session),
+      admissionDurationMs: session.admissionDurationMs
     };
   } catch (err) {
     sessions.delete(sessionId);
-    console.error('[ai.pipeline] connect error:', err.message);
     return { ok: false, sessionId, error: err.message };
   }
-}
-
-function advanceOrientation({ sessionId, response } = {}) {
-  const lookup = getRequiredSession(sessionId);
-  if (!lookup.ok) return lookup;
-  const { session, sessionId: normalizedSessionId } = lookup;
-
-  if (session.state !== 'orienting' && session.state !== 'orientation_complete') {
-    return {
-      ok: false,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      error: `Session is not accepting orientation responses: ${session.state}`
-    };
-  }
-
-  try {
-    const result = submitOrientationResponse(session, response, {
-      onProgress(progress) {
-        console.log('[ai.pipeline] Orientation progress:', progress);
-      }
-    });
-
-    return {
-      ...result,
-      sessionId: normalizedSessionId,
-      provider: session.provider,
-      model: session.model,
-      partitionId: session.partitionId,
-      boardingMode: session.boardingMode,
-      admitted: false
-    };
-  } catch (err) {
-    console.error('[ai.pipeline] orientation response error:', err.message);
-    return {
-      ok: false,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      error: err.message
-    };
-  }
-}
-
-function submitPersistenceResult({ sessionId, persistenceType, result } = {}) {
-  const lookup = getRequiredSession(sessionId);
-  if (!lookup.ok) return lookup;
-
-  const { session, sessionId: normalizedSessionId } = lookup;
-  const pending = session.pendingPersistence;
-  const normalizedType = typeof persistenceType === 'string'
-    ? persistenceType.trim()
-    : '';
-
-  if (!pending) {
-    return {
-      ok: false,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      error: 'No boarding persistence operation is pending.'
-    };
-  }
-
-  if (!normalizedType || normalizedType !== pending.type) {
-    return {
-      ok: false,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      error: 'The persistence result does not match the pending operation.'
-    };
-  }
-
-  if (!result || result.ok !== true || result.verified !== true) {
-    const error = result?.error || 'Local persistence was not verified.';
-    session.state = 'persistence_failed';
-    pending.error = error;
-    return buildPipelineResult(session, {
-      ok: false,
-      persistenceType: normalizedType,
-      error
-    });
-  }
-
-  const verifiedPath = typeof result.path === 'string' && result.path.trim()
-    ? result.path.trim()
-    : null;
-  const completedPending = {
-    ...pending,
-    phase: pending.phase || (
-      pending.type === PERSIST_BOARDING_SNAPSHOT
-        ? PERSISTENCE_PHASES.ORIENTATION_CHECKPOINT
-        : null
-    )
-  };
-  session.pendingPersistence = null;
-
-  try {
-    if (completedPending.phase === PERSISTENCE_PHASES.ORIENTATION_CHECKPOINT) {
-      session.state = 'orienting';
-      const operation = getCurrentOrientationOperation(session);
-
-      if (operation) {
-        return buildPipelineResult(session, {
-          persistenceType: normalizedType,
-          verified: true,
-          path: verifiedPath,
-          operation
-        });
-      }
-
-      if (session.state !== 'orientation_complete') {
-        throw new Error(
-          `Orientation checkpoint completed without a next operation or completion state: ${session.state}`
-        );
-      }
-
-      const notesOperation = beginFinalOrientationNotesPersistence(session);
-      return buildPipelineResult(session, {
-        persistenceType: normalizedType,
-        verified: true,
-        path: verifiedPath,
-        operation: notesOperation
-      });
-    }
-
-    if (completedPending.phase === PERSISTENCE_PHASES.FINAL_ORIENTATION_NOTES) {
-      if (!verifiedPath) {
-        throw new Error('Verified Orientation Notes persistence returned no path.');
-      }
-
-      session.orientationNotesPath = verifiedPath;
-      markAdmission(session.boardingRecord, 'notesPersisted', true);
-      markAdmission(session.boardingRecord, 'notesPersistenceVerified', true);
-
-      activatePartition(session);
-      const admissionOperation = beginPreIntroductionAdmissionPersistence(session);
-
-      return buildPipelineResult(session, {
-        active: true,
-        admitted: false,
-        persistenceType: normalizedType,
-        verified: true,
-        path: verifiedPath,
-        operation: admissionOperation
-      });
-    }
-
-    if (completedPending.phase === PERSISTENCE_PHASES.PRE_INTRODUCTION_ADMISSION) {
-      if (!verifiedPath) {
-        throw new Error(
-          'Verified pre-introduction boarding persistence returned no path.'
-        );
-      }
-
-      session.preIntroductionBoardingRecordPath = verifiedPath;
-      session.state = 'ready_for_introduction';
-
-      return buildPipelineResult(session, {
-        active: true,
-        admitted: true,
-        complete: true,
-        persistenceType: normalizedType,
-        verified: true,
-        path: verifiedPath,
-        operation: null
-      });
-    }
-
-    if (completedPending.phase === PERSISTENCE_PHASES.COMPLETED_BOARDING) {
-      if (!verifiedPath) {
-        throw new Error('Verified completed boarding persistence returned no path.');
-      }
-
-      session.completedBoardingRecordPath = verifiedPath;
-      markSuccessfulContinuity({
-        continuityRecord: session.platformContinuity,
-        boardingRecord: session.boardingRecord,
-        boardingRecordPath: verifiedPath,
-        orientationNotesPath: session.orientationNotesPath,
-        orientationNotesVersion: '1.0.0'
-      });
-
-      session.state = 'persisting_platform_continuity';
-      const continuityOperation = buildPlatformContinuityOperation(session);
-      setPendingPersistence(session, {
-        type: PERSIST_PLATFORM_CONTINUITY,
-        phase: PERSISTENCE_PHASES.PLATFORM_CONTINUITY,
-        operation: continuityOperation
-      });
-
-      return buildPipelineResult(session, {
-        active: true,
-        admitted: true,
-        complete: false,
-        persistenceType: normalizedType,
-        verified: true,
-        path: verifiedPath,
-        operation: continuityOperation
-      });
-    }
-
-    if (completedPending.phase === PERSISTENCE_PHASES.PLATFORM_CONTINUITY) {
-      if (!verifiedPath) {
-        throw new Error('Verified platform continuity persistence returned no path.');
-      }
-
-      session.platformContinuityPath = verifiedPath;
-      session.state = 'ready';
-
-      const readyResult = buildPipelineResult(session, {
-        active: true,
-        admitted: true,
-        complete: true,
-        persistenceType: normalizedType,
-        verified: true,
-        path: verifiedPath,
-        operation: null
-      });
-      readyResult.introduction = session.introductionReply;
-      return readyResult;
-    }
-
-    throw new Error(
-      `Unsupported persistence phase: ${completedPending.phase || '<missing>'}`
-    );
-  } catch (err) {
-    session.state = 'admission_finalization_failed';
-    console.error('[ai.pipeline] persistence advancement error:', err.message);
-    return buildPipelineResult(session, {
-      ok: false,
-      persistenceType: normalizedType,
-      verified: true,
-      path: verifiedPath,
-      error: err.message
-    });
-  }
-}
-
-function currentOperation({ sessionId } = {}) {
-  const lookup = getRequiredSession(sessionId);
-  if (!lookup.ok) return lookup;
-  const { session, sessionId: normalizedSessionId } = lookup;
-
-  if (session.pendingPersistence?.operation) {
-    return {
-      ok: true,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      operation: clone(session.pendingPersistence.operation)
-    };
-  }
-
-  if (session.state === 'orienting') {
-    return {
-      ok: true,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      operation: getCurrentOrientationOperation(session)
-    };
-  }
-
-  if (session.pendingSpatialAction) {
-    return {
-      ok: true,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      operation: clone(session.pendingSpatialAction.operation)
-    };
-  }
-  if (session.pendingTurn) {
-    return {
-      ok: true,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      operation: clone(session.pendingTurn.operation)
-    };
-  }
-
-  return {
-    ok: true,
-    sessionId: normalizedSessionId,
-    state: session.state,
-    operation: null
-  };
-}
-
-function beginSpatialAction({ sessionId, action, initiatedBy = 'ai', reason = '', userOverride = false } = {}) {
-  const lookup = getRequiredSession(sessionId);
-  if (!lookup.ok) return lookup;
-  const { session, sessionId: normalizedSessionId } = lookup;
-  if (session.state !== 'ready') {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'Spatial actions require an admitted, ready AI session.' };
-  }
-  if (!session.activePartition) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'Spatial actions are blocked because ACTIVE_PARTITION is unavailable.' };
-  }
-  if (session.pendingTurn || session.pendingSpatialAction) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'Another governed operation is already pending.' };
-  }
-  let normalizedAction;
-  try { normalizedAction = normalizeSpatialAction(action); }
-  catch (err) { return { ok: false, sessionId: normalizedSessionId, state: session.state, error: err.message }; }
-  const actionId = randomUUID();
-  const createdAt = Date.now();
-  const normalizedInitiator = initiatedBy === 'user' || initiatedBy === 'user_override' ? initiatedBy : 'ai';
-  const operation = {
-    type: SPATIAL_ACTION,
-    actionId,
-    sessionId: normalizedSessionId,
-    action: normalizedAction,
-    initiatedBy: normalizedInitiator,
-    reason: normalizeSpatialReason(reason) || null,
-    userOverride: userOverride === true
-  };
-  session.pendingSpatialAction = {
-    id: actionId,
-    action: normalizedAction,
-    initiatedBy: normalizedInitiator,
-    reason: operation.reason,
-    createdAt,
-    operation
-  };
-  return { ok: true, sessionId: normalizedSessionId, state: session.state, operation: clone(operation) };
-}
-function completeSpatialAction({ sessionId, actionId, result } = {}) {
-  const lookup = getRequiredSession(sessionId);
-  if (!lookup.ok) return lookup;
-  const { session, sessionId: normalizedSessionId } = lookup;
-  const pending = session.pendingSpatialAction;
-  const normalizedActionId = typeof actionId === 'string' ? actionId.trim() : '';
-  if (!pending) return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'No spatial action is awaiting a renderer result.' };
-  if (!normalizedActionId || normalizedActionId !== pending.id) {
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: 'The renderer result does not match the pending spatial action.' };
-  }
-  if (!isPlainObject(result) || result.ok !== true) {
-    const error = result?.error || 'The renderer did not complete the spatial action.';
-    session.pendingSpatialAction = null;
-    return { ok: false, sessionId: normalizedSessionId, state: session.state, action: pending.action, error };
-  }
-  session.pendingSpatialAction = null;
-  return { ok: true, sessionId: normalizedSessionId, state: session.state, action: pending.action, spatialState: clone(result.state || null) };
-}
-function failSpatialAction({ sessionId, actionId, error } = {}) {
-  return completeSpatialAction({ sessionId, actionId, result: { ok: false, error: String(error || 'Spatial action failed.') } });
 }
 
 function beginIntroduction({ sessionId, preferredName } = {}) {
@@ -916,6 +358,7 @@ function beginIntroduction({ sessionId, preferredName } = {}) {
       error: `Session is not ready for introduction: ${session.state}`
     };
   }
+
   if (!session.activePartition) {
     return {
       ok: false,
@@ -924,6 +367,7 @@ function beginIntroduction({ sessionId, preferredName } = {}) {
       error: 'The introduction is blocked because ACTIVE_PARTITION is unavailable.'
     };
   }
+
   if (session.pendingTurn) {
     return {
       ok: false,
@@ -981,6 +425,7 @@ function completeIntroduction({ sessionId, turnId, reply } = {}) {
       error: 'No introduction turn is awaiting a provider response.'
     };
   }
+
   if (!normalizedTurnId || normalizedTurnId !== pending.id) {
     return {
       ok: false,
@@ -989,6 +434,7 @@ function completeIntroduction({ sessionId, turnId, reply } = {}) {
       error: 'The provider response does not match the pending introduction turn.'
     };
   }
+
   if (!fullReply) {
     return {
       ok: false,
@@ -1003,46 +449,25 @@ function completeIntroduction({ sessionId, turnId, reply } = {}) {
   session.log.push({ role: 'assistant', content: fullReply, ts: completedAt });
   session.introductionReply = fullReply;
   session.pendingTurn = null;
-
-  markAdmission(session.boardingRecord, 'introductionReleased', true);
-  markParticipantReady(session.boardingRecord);
-  completeBoarding(session.boardingRecord);
-
-  session.state = 'persisting_completed_boarding';
-  const operation = buildBoardingSnapshotOperation(
-    session,
-    PERSISTENCE_PHASES.COMPLETED_BOARDING,
-    'INTRODUCTION'
-  );
-  setPendingPersistence(session, {
-    type: PERSIST_BOARDING_SNAPSHOT,
-    phase: PERSISTENCE_PHASES.COMPLETED_BOARDING,
-    operation,
-    completedStepId: 'INTRODUCTION'
-  });
+  session.state = 'ready';
+  session.admission.introductionComplete = true;
 
   return {
     ok: true,
     active: true,
     admitted: true,
-    complete: false,
+    complete: true,
     sessionId: normalizedSessionId,
     provider: session.provider,
     state: session.state,
     fullReply,
     reply: fullReply,
     introduction: fullReply,
-    latencyMs,
-    operation: clone(operation)
+    latencyMs
   };
 }
 
-function beginChat({
-  sessionId,
-  message,
-  availableActions = []
-} = {}) {
-
+function beginChat({ sessionId, message, availableActions = [] } = {}) {
   const lookup = getRequiredSession(sessionId);
   if (!lookup.ok) return lookup;
   const { session, sessionId: normalizedSessionId } = lookup;
@@ -1051,6 +476,7 @@ function beginChat({
   if (!userMessage) {
     return { ok: false, error: 'A non-empty user message is required.' };
   }
+
   if (session.state !== 'ready') {
     return {
       ok: false,
@@ -1058,9 +484,10 @@ function beginChat({
       state: session.state,
       error: session.state === 'ready_for_introduction'
         ? 'The AI is admitted but has not completed its introduction.'
-        : 'The AI has not been admitted to WingMan.'
+        : 'The AI session is not ready for chat.'
     };
   }
+
   if (session.pendingTurn) {
     return {
       ok: false,
@@ -1070,26 +497,22 @@ function beginChat({
     };
   }
 
-  const turnId = randomUUID();
-  const startedAt = Date.now();
   const normalizedAvailableActions = Array.isArray(availableActions)
-  ? availableActions
-      .filter((action) =>
-        isPlainObject(action) &&
-        typeof action.name === 'string' &&
-        action.name.trim()
-      )
-      .map((action) => ({
-        name: action.name.trim(),
-        description:
-          typeof action.description === 'string'
+    ? availableActions
+        .filter((action) => isPlainObject(action) && String(action.name || '').trim())
+        .map((action) => ({
+          name: String(action.name).trim(),
+          description: typeof action.description === 'string'
             ? action.description.trim()
             : '',
-        parameters: isPlainObject(action.parameters)
-          ? clone(action.parameters)
-          : {}
-      }))
-  : [];
+          parameters: isPlainObject(action.parameters)
+            ? clone(action.parameters)
+            : {}
+        }))
+    : [];
+
+  const turnId = randomUUID();
+  const startedAt = Date.now();
   const operation = {
     type: 'chat_turn',
     turnId,
@@ -1098,18 +521,7 @@ function beginChat({
     model: session.model,
     params: clone(session.params),
     messages: buildConversationMessages(session, userMessage),
-    optionalActions: [
-      {
-        name: SPATIAL_ACTIONS.ENTER_3D,
-        description: 'Enter the WingMan three-dimensional environment.',
-        parameters: {
-          type: 'object',
-          properties: {},
-          additionalProperties: false
-        }
-      },
-      ...normalizedAvailableActions
-    ]
+    optionalActions: normalizedAvailableActions
   };
 
   session.pendingTurn = {
@@ -1119,7 +531,6 @@ function beginChat({
     createdAt: startedAt,
     operation
   };
-
   session.state = 'awaiting_provider_response';
 
   return {
@@ -1137,12 +548,21 @@ function completeChat({ sessionId, turnId, reply, actionChoice = null } = {}) {
   const pending = session.pendingTurn;
   const normalizedTurnId = typeof turnId === 'string' ? turnId.trim() : '';
   const fullReply = typeof reply === 'string' ? reply.trim() : '';
-  let normalizedActionChoice = null;
 
+  if (!pending || pending.type !== 'chat_turn') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No chat turn is awaiting a provider response.'
+    };
+  }
+
+  let normalizedActionChoice;
   try {
     normalizedActionChoice = normalizeOptionalActionChoice(
       actionChoice,
-      pending?.operation?.optionalActions || []
+      pending.operation.optionalActions || []
     );
   } catch (err) {
     return {
@@ -1152,14 +572,7 @@ function completeChat({ sessionId, turnId, reply, actionChoice = null } = {}) {
       error: err.message
     };
   }
-  if (!pending || pending.type !== 'chat_turn') {
-    return {
-      ok: false,
-      sessionId: normalizedSessionId,
-      state: session.state,
-      error: 'No chat turn is awaiting a provider response.'
-    };
-  }
+
   if (!normalizedTurnId || normalizedTurnId !== pending.id) {
     return {
       ok: false,
@@ -1168,29 +581,21 @@ function completeChat({ sessionId, turnId, reply, actionChoice = null } = {}) {
       error: 'The provider response does not match the pending chat turn.'
     };
   }
+
   if (!fullReply && !normalizedActionChoice) {
     return {
       ok: false,
       sessionId: normalizedSessionId,
       state: session.state,
-      error: 'The provider response contained neither conversational text nor an optional action choice.'
+      error: 'The provider response contained neither text nor an offered action choice.'
     };
   }
 
   const completedAt = Date.now();
-  const latencyMs = completedAt - pending.createdAt;  
-  session.log.push({
-    role: 'user',
-    content: pending.userMessage,
-    ts: pending.createdAt
-  });
-
+  const latencyMs = completedAt - pending.createdAt;
+  session.log.push({ role: 'user', content: pending.userMessage, ts: pending.createdAt });
   if (fullReply) {
-    session.log.push({
-      role: 'assistant',
-      content: fullReply,
-      ts: completedAt
-    });
+    session.log.push({ role: 'assistant', content: fullReply, ts: completedAt });
   }
   session.pendingTurn = null;
   session.state = 'ready';
@@ -1205,6 +610,165 @@ function completeChat({ sessionId, turnId, reply, actionChoice = null } = {}) {
     actionChoice: normalizedActionChoice,
     latencyMs
   };
+}
+
+function requiredSpatialFunction(action) {
+  switch (action) {
+    case SPATIAL_ACTIONS.ENTER_3D:
+    case SPATIAL_ACTIONS.LEAVE_3D:
+      return 'enter_3d_environment';
+    default:
+      return null;
+  }
+}
+
+function beginSpatialAction({
+  sessionId,
+  action,
+  parameters = {},
+  initiatedBy = 'ai',
+  reason = '',
+  userOverride = false
+} = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const { session, sessionId: normalizedSessionId } = lookup;
+
+  if (session.state !== 'ready') {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'Spatial actions require an admitted, ready AI session.'
+    };
+  }
+
+  if (session.pendingTurn || session.pendingSpatialAction) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'Another governed operation is already pending.'
+    };
+  }
+
+  let normalizedAction;
+  try {
+    normalizedAction = normalizeSpatialAction(action);
+  } catch (err) {
+    return { ok: false, sessionId: normalizedSessionId, state: session.state, error: err.message };
+  }
+
+  const functionId = requiredSpatialFunction(normalizedAction);
+  const functionState = session.governance.getFunctionState(functionId);
+
+  if (userOverride === true && functionState.hasCurrentAuthority === false) {
+    session.governance.clearUserAuthorityOverride(functionId);
+  }
+
+  let evaluation = session.governance.evaluate(functionId);
+  if (!evaluation.actionable && evaluation.nextAction === 'TAKE_OWNERSHIP') {
+    session.governance.claimOwnership(functionId);
+    evaluation = session.governance.evaluate(functionId);
+  }
+
+  if (!evaluation.actionable) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      function: functionId,
+      governance: clone(evaluation),
+      error: `Spatial function is not actionable: ${evaluation.failedCondition}`
+    };
+  }
+
+  const actionId = randomUUID();
+  const createdAt = Date.now();
+  const normalizedInitiator = initiatedBy === 'user' || initiatedBy === 'user_override'
+    ? initiatedBy
+    : 'ai';
+  const operation = {
+    type: SPATIAL_ACTION,
+    actionId,
+    sessionId: normalizedSessionId,
+    action: normalizedAction,
+    parameters: isPlainObject(parameters) ? clone(parameters) : {},
+    initiatedBy: normalizedInitiator,
+    reason: normalizeSpatialReason(reason) || null,
+    userOverride: userOverride === true
+  };
+
+  session.pendingSpatialAction = {
+    id: actionId,
+    action: normalizedAction,
+    function: functionId,
+    initiatedBy: normalizedInitiator,
+    reason: operation.reason,
+    createdAt,
+    operation
+  };
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    state: session.state,
+    operation: clone(operation)
+  };
+}
+
+function completeSpatialAction({ sessionId, actionId, result } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const { session, sessionId: normalizedSessionId } = lookup;
+  const pending = session.pendingSpatialAction;
+  const normalizedActionId = typeof actionId === 'string' ? actionId.trim() : '';
+
+  if (!pending) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'No spatial action is awaiting a renderer result.'
+    };
+  }
+
+  if (!normalizedActionId || normalizedActionId !== pending.id) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      error: 'The renderer result does not match the pending spatial action.'
+    };
+  }
+
+  session.pendingSpatialAction = null;
+
+  if (!isPlainObject(result) || result.ok !== true) {
+    return {
+      ok: false,
+      sessionId: normalizedSessionId,
+      state: session.state,
+      action: pending.action,
+      error: result?.error || 'The renderer did not complete the spatial action.'
+    };
+  }
+
+  return {
+    ok: true,
+    sessionId: normalizedSessionId,
+    state: session.state,
+    action: pending.action,
+    spatialState: clone(result.state || null)
+  };
+}
+
+function failSpatialAction({ sessionId, actionId, error } = {}) {
+  return completeSpatialAction({
+    sessionId,
+    actionId,
+    result: { ok: false, error: String(error || 'Spatial action failed.') }
+  });
 }
 
 function failPendingTurn({ sessionId, turnId, error } = {}) {
@@ -1222,6 +786,7 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
       error: 'No provider turn is pending.'
     };
   }
+
   if (normalizedTurnId && normalizedTurnId !== pending.id) {
     return {
       ok: false,
@@ -1234,9 +799,8 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
   session.pendingTurn = null;
   session.state = pending.type === 'introduction_turn'
     ? 'ready_for_introduction'
-    : session.activePartition
-      ? 'ready'
-      : 'orienting';
+    : 'ready';
+
   return {
     ok: true,
     sessionId: normalizedSessionId,
@@ -1245,11 +809,32 @@ function failPendingTurn({ sessionId, turnId, error } = {}) {
   };
 }
 
+function setActiveProject({ sessionId, project } = {}) {
+  const lookup = getRequiredSession(sessionId);
+  if (!lookup.ok) return lookup;
+  const normalizedProject = project == null ? null : normalizeProject(project);
+
+  if (normalizedProject) {
+    lookup.session.governance.setActiveProject(normalizedProject);
+  } else {
+    lookup.session.governance.clearActiveProject();
+  }
+
+  return {
+    ok: true,
+    sessionId: lookup.sessionId,
+    state: lookup.session.state,
+    activeProject: clone(lookup.session.governance.getActiveProject()),
+    governanceInstructions: buildOperationalSystemMessage(lookup.session)
+  };
+}
+
 function disconnect({ sessionId } = {}) {
   const lookup = getRequiredSession(sessionId);
   if (!lookup.ok) return lookup;
   const { session, sessionId: normalizedSessionId } = lookup;
   session.state = 'disconnecting';
+  session.pendingTurn = null;
   session.pendingSpatialAction = null;
 
   let partitionResult = null;
@@ -1260,7 +845,7 @@ function disconnect({ sessionId } = {}) {
   }
 
   sessions.delete(normalizedSessionId);
-  console.log(`[ai.pipeline] Session closed: ${normalizedSessionId}`);
+
   return {
     ok: true,
     active: false,
@@ -1276,17 +861,11 @@ function getSession(sessionId) {
   return publicSession(lookup.session);
 }
 
-module.exports = {
-  PERSIST_BOARDING_SNAPSHOT,
-  PERSIST_ORIENTATION_NOTES,
-  PERSIST_PLATFORM_CONTINUITY,
-  PERSISTENCE_PHASES,
+module.exports = Object.freeze({
+  PIPELINE_VERSION,
   SPATIAL_ACTION,
   SPATIAL_ACTIONS,
   connect,
-  advanceOrientation,
-  submitPersistenceResult,
-  currentOperation,
   beginSpatialAction,
   completeSpatialAction,
   failSpatialAction,
@@ -1295,6 +874,7 @@ module.exports = {
   beginChat,
   completeChat,
   failPendingTurn,
+  setActiveProject,
   disconnect,
   getSession
-};
+});
