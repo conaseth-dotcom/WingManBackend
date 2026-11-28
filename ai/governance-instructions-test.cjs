@@ -143,3 +143,17 @@ test("full generated instruction includes failure persistence and CONSULT USER g
   assert.match(text, /CONSULT USER/);
   assert.match(text, /Do not replace an unresolved active objective with a generic offer/);
 });
+test("generated governance state exposes Partition read and history append authority", () => {
+  const runtime = createFunctionRuntimeState();
+  const output = buildCurrentStateBlock(runtime);
+
+  assert.match(
+    output,
+    /read_partition \| STATE=AVAILABLE \| AUTHORITY=YES \| SCOPE=STANDING_PARTICIPANT \| OWNERSHIP=SURRENDERED/
+  );
+
+  assert.match(
+    output,
+    /append_history \| STATE=AVAILABLE \| AUTHORITY=YES \| SCOPE=STANDING_PARTICIPANT \| OWNERSHIP=SURRENDERED/
+  );
+});

@@ -30,7 +30,7 @@ function applyTemporaryUserOverride(name, hasCurrentAuthority) {
 }
 
 test("production catalog: expected standing function set is loaded", () => {
-  assert.equal(listAIFunctions().length, 17);
+  assert.equal(listAIFunctions().length, 19);
 });
 
 test("catalog: core embodied participant functions begin available and authorized", () => {
@@ -47,8 +47,22 @@ test("catalog: core embodied participant functions begin available and authorize
   }
 });
 
-test("history: read is standing authority", () => {
-  assert.equal(mayTakeOwnership("read_history"), true);
+test("Partition: discover and read visible resources is standing authority", () => {
+  const fn = getAIFunction("read_partition");
+  assert.equal(fn.currentState, FUNCTION_STATE.AVAILABLE);
+  assert.equal(fn.hasCurrentAuthority, true);
+  assert.equal(fn.scopeType, SCOPE_TYPE.STANDING_PARTICIPANT);
+  assert.equal(mayTakeOwnership("read_partition"), true);
+});
+
+test("history: read and append are standing authority", () => {
+  for (const name of ["read_history", "append_history"]) {
+    const fn = getAIFunction(name);
+    assert.equal(fn.currentState, FUNCTION_STATE.AVAILABLE, name);
+    assert.equal(fn.hasCurrentAuthority, true, name);
+    assert.equal(fn.scopeType, SCOPE_TYPE.STANDING_PARTICIPANT, name);
+    assert.equal(mayTakeOwnership(name), true, name);
+  }
 });
 
 test("history: edit and delete are disallowed", () => {
@@ -90,9 +104,21 @@ test("relationship: major restructuring is available but lacks standing authorit
   assert.equal(mayTakeOwnership("restructure_relationship_state"), false);
 });
 
+test("isolation: Partition read authority does not grant protected history mutation", () => {
+  assert.equal(mayTakeOwnership("read_partition"), true);
+  assert.equal(mayTakeOwnership("edit_history"), false);
+  assert.equal(mayTakeOwnership("delete_history"), false);
+});
+
 test("isolation: scratchpad authority does not grant relationship restructuring authority", () => {
   assert.equal(mayTakeOwnership("reorganize_ai_scratchpad"), true);
   assert.equal(mayTakeOwnership("restructure_relationship_state"), false);
+});
+
+test("temporary override: Partition read authority may be turned off without changing availability", () => {
+  const overridden = applyTemporaryUserOverride("read_partition", false);
+  assert.equal(overridden.currentState, FUNCTION_STATE.AVAILABLE);
+  assert.equal(overridden.hasCurrentAuthority, false);
 });
 
 test("temporary override: 3D authority may be turned off without changing availability", () => {

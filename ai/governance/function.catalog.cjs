@@ -95,9 +95,25 @@ const AI_STANDING_FUNCTIONS = Object.freeze({
     scopeType: SCOPE_TYPE.STANDING_PARTICIPANT,
   }),
 
+  read_partition: defineFunction({
+    id: "read_partition",
+    description: "Discover and read visible Partition resources. Explicit user visibility restrictions still apply.",
+    currentState: FUNCTION_STATE.AVAILABLE,
+    hasCurrentAuthority: true,
+    scopeType: SCOPE_TYPE.STANDING_PARTICIPANT,
+  }),
+
   read_history: defineFunction({
     id: "read_history",
     description: "Read authorized historical records belonging to the AI participant's continuity.",
+    currentState: FUNCTION_STATE.AVAILABLE,
+    hasCurrentAuthority: true,
+    scopeType: SCOPE_TYPE.STANDING_PARTICIPANT,
+  }),
+
+  append_history: defineFunction({
+    id: "append_history",
+    description: "Append new material to preserved historical records without altering existing history.",
     currentState: FUNCTION_STATE.AVAILABLE,
     hasCurrentAuthority: true,
     scopeType: SCOPE_TYPE.STANDING_PARTICIPANT,
